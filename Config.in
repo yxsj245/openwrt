@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (C) 2006-2013 OpenWrt.org
+
 mainmenu "OpenWrt Configuration"
 
 config MODULES
@@ -22,8 +26,6 @@ source "target/Config.in"
 source "config/Config-images.in"
 
 source "config/Config-build.in"
-
-source "config/Config-thirdparty.in"
 
 source "config/Config-devel.in"
 
