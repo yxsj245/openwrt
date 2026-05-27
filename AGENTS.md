@@ -8,60 +8,12 @@ MCP名称：SSH-MCP_System_compilation 项目目录：/opt/project/openwrt
 
 ---
 
-## 虚拟机参考规格
+## 虚拟机
 
-以下为当前编译机上运行的 OpenWrt 测试虚拟机 `openwrt-vm` 的完整配置，后续创建新虚拟机时必须参照此规格：IP是192.168.122.3。没用硬件虚拟化。
+> 测试虚拟机 IP 为 `192.168.122.3`，基于 UEFI 固件的 QEMU/KVM x86_64 虚拟机。完整规格及创建命令查阅 [docs/vm-specs.md](docs/vm-specs.md)。
 
-| 参数 | 值 |
-|------|-----|
-| **VM名称** | openwrt-vm |
-| **UUID** | cc74c82d-4dfd-43bf-98c0-bd25c15d3b02 |
-| **架构/虚拟机类型** | x86_64 / qemu (KVM) |
-| **机器型号** | pc-q35-10.2 |
-| **固件** | UEFI (OVMF)，`/usr/share/OVMF/OVMF_CODE_4M.fd` |
-| **NVRAM模板** | `/usr/share/OVMF/OVMF_VARS_4M.fd` |
-| **Secure Boot** | 禁用 |
-| **vCPU** | 1 (static placement) |
-| **内存** | 1 GiB (1048576 KiB) |
-| **CPU型号** | qemu64 (custom, match=exact, check=full) |
-| **CPU特性** | hypervisor (require), lahf_lm (require) |
-| **磁盘格式** | qcow2 (driver: qemu) |
-| **磁盘虚拟大小** | 1 GiB |
-| **磁盘总线** | virtio (vda) |
-| **磁盘存放目录** | `/home/xiaozhu/vms/` |
-| **网络类型** | NAT 网络（libvirt default 网络），bridge: `virbr0` |
-| **网卡型号** | virtio |
-| **MAC地址** | 52:54:00:4c:f3:d5 |
-| **VNC** | 端口 5900（display `:0`），监听 `0.0.0.0`，autoport=yes |
-| **显示** | virtio (heads=1) |
-| **输入** | PS/2 鼠标 + 键盘 |
-| **音频** | 无 (type='none') |
-| **串口** | pty (`/dev/pts/4`) |
-| **Watchdog** | itco, action=reset |
-| **RNG** | virtio, `/dev/urandom` |
-| **Memballoon** | virtio |
-| **ACPI/APIC** | 启用 |
-| **时钟** | UTC (rtc track=guest, pit delay, hpet=no) |
-| **电源动作** | on_poweroff=destroy, on_reboot=restart, on_crash=destroy |
-| **模拟器** | `/usr/bin/qemu-system-x86_64` |
-| **VM IP** | 192.168.122.3 |
+---
 
-### 创建新虚拟机参考命令
+## 服务管理规则
 
-```bash
-# 基于此规格创建新虚拟机的 virt-install 或 qemu 命令参数应与此规格一致
-# 最小化参数示例：
-virt-install \
-  --name openwrt-vm \
-  --ram 1024 \
-  --vcpus 1 \
-  --cpu qemu64 \
-  --os-variant generic \
-  --boot uefi \
-  --disk path=/home/xiaozhu/vms/openwrt-vm.qcow2,format=qcow2,bus=virtio,size=1 \
-  --network network=default,model=virtio \
-  --graphics vnc,listen=0.0.0.0 \
-  --video virtio \
-  --rng /dev/urandom \
-  --import
-```
+> 任何涉及在 OpenWrt 上部署新程序/服务（如 nginx、samba、frp 等）时，**必须**使用 IDE 弹窗询问用户是否需要将其加入 LuCI 服务管理页面统一管理。具体实现方式查阅 [docs/services.md](docs/services.md)。
