@@ -1,0 +1,68 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "Loading..."
+msgstr ""
+
+msgid "Checking..."
+msgstr ""
+
+msgid "Start"
+msgstr ""
+
+msgid "Stop"
+msgstr ""
+
+msgid "Restart"
+msgstr ""
+
+msgid "Enable"
+msgstr ""
+
+msgid "Disable"
+msgstr ""
+
+msgid "Enabling"
+msgstr ""
+
+msgid "Disabling"
+msgstr ""
+
+msgid "Starting"
+msgstr ""
+
+msgid "Stopping"
+msgstr ""
+
+msgid "Restarting"
+msgstr ""
+
+msgid "Running"
+msgstr ""
+
+msgid "Stopped"
+msgstr ""
+
+msgid "Auto-start"
+msgstr ""
+
+msgid "Manual"
+msgstr ""
+
+msgid "服务管理"
+msgstr ""
+
+msgid "在此页面可以管理系统中的各项服务。您可以启动、停止服务，以及设置服务是否开机自启。"
+msgstr ""
+
+msgid "注意：默认情况下所有服务均为关闭状态，需要手动启用。"
+msgstr ""
+
+msgid "提示："
+msgstr ""
+
+msgid "启用"开机自启"后，服务会在系统启动时自动运行。启用 Docker 后，您可以通过 Docker 管理页面进行容器、镜像等详细管理。"
+msgstr ""
+
+msgid "Service operation failed: %s"
+msgstr ""

@@ -1,0 +1,13 @@
+{
+	"admin/system/services": {
+		"title": "服务",
+		"order": 90,
+		"action": {
+			"type": "view",
+			"path": "system/services"
+		},
+		"depends": {
+			"acl": [ "luci-app-services" ]
+		}
+	}
+}

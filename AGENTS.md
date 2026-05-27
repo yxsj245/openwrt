@@ -10,7 +10,7 @@ MCP名称：SSH-MCP_System_compilation 项目目录：/opt/project/openwrt
 
 ## 虚拟机参考规格
 
-以下为当前编译机上运行的 OpenWrt 测试虚拟机 `openwrt-vm` 的完整配置，后续创建新虚拟机时必须参照此规格：
+以下为当前编译机上运行的 OpenWrt 测试虚拟机 `openwrt-vm` 的完整配置，后续创建新虚拟机时必须参照此规格：IP是192.168.122.3。没用硬件虚拟化。
 
 | 参数 | 值 |
 |------|-----|

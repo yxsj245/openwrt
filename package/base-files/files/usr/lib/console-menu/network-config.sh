@@ -121,6 +121,9 @@ apply_config() {
 			;;
 	esac
 
+	# 清理桥接从属接口的重复IP配置
+	cleanup_bridge_slaves "$iface"
+
 	uci commit network
 
 	echo ""
@@ -130,6 +133,24 @@ apply_config() {
 	echo "  Done."
 	printf "  Press Enter to return..."
 	read dummy < /dev/tty
+}
+
+cleanup_bridge_slaves() {
+	local master="$1"
+	uci show network 2>/dev/null | grep "\.device='" | while IFS='=' read -r key val; do
+		local dev=$(echo "$val" | tr -d "'")
+		local sec=$(echo "$key" | cut -d'.' -f2)
+		[ "$sec" = "loopback" ] && continue
+		[ -d "/sys/class/net/${dev}/brport" ] || [ -L "/sys/class/net/${dev}/master" ] || continue
+		local br_master
+		[ -L "/sys/class/net/${dev}/master" ] && br_master=$(basename "$(readlink "/sys/class/net/${dev}/master")")
+		if [ "$br_master" = "$master" ]; then
+			local sec_ip=$(uci -q get "network.${sec}.ipaddr")
+			if [ "$sec_ip" = "$CONFIG_IP" ]; then
+				uci delete "network.${sec}"
+			fi
+		fi
+	done
 }
 
 config_interface() {

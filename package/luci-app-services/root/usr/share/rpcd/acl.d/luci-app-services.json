@@ -1,0 +1,15 @@
+{
+	"luci-app-services": {
+		"description": "Grant access to service management",
+		"read": {
+			"ubus": {
+				"rc": [ "init", "list" ]
+			}
+		},
+		"write": {
+			"ubus": {
+				"rc": [ "init" ]
+			}
+		}
+	}
+}
