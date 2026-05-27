@@ -12,7 +12,7 @@
 make menuconfig
 # 开始编译
 make download -j$(nproc)
-make V=s -j$(nproc) 2>&1 | grep -i error
+make -j12 V=s 2>&1 | tee build.log
 ```
 
 ## 清理缓存
