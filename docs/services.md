@@ -152,6 +152,10 @@ var SERVICE_DEFINITIONS = [
     /etc/init.d/nginx stop 2>/dev/null
     /etc/init.d/nginx disable 2>/dev/null
 }
+[ -x /etc/init.d/uuplugin ] && {
+    /etc/init.d/uuplugin stop 2>/dev/null
+    /etc/init.d/uuplugin disable 2>/dev/null
+}
 exit 0
 ```
 
