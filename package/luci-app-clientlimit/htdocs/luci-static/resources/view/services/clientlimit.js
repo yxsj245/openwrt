@@ -2,8 +2,7 @@
 'require view';
 'require form';
 'require uci';
-'require ui';
-'require network';
+'require tools.widgets as widgets';
 
 return view.extend({
 	load: function() {
@@ -23,8 +22,10 @@ return view.extend({
 		o = s.option(form.Flag, 'enabled', _('启用限速'));
 		o.rmempty = false;
 
-		o = s.option(form.DynamicList, 'lan_interfaces', _('内网接口'),
+		o = s.option(widgets.NetworkSelect, 'lan_interfaces', _('内网接口'),
 			_('指定哪些接口为内网接口，用于识别并列出在线的内网客户端列表。'));
+		o.multiple = true;
+		o.nocreate = true;
 		o.rmempty = false;
 		o.default = 'lan';
 
