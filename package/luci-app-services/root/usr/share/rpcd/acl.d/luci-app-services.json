@@ -3,7 +3,8 @@
 		"description": "Grant access to service management",
 		"read": {
 			"ubus": {
-				"rc": [ "init", "list" ]
+				"rc": [ "init", "list" ],
+				"service": [ "list" ]
 			}
 		},
 		"write": {

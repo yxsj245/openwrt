@@ -7,7 +7,7 @@
 | 平台 | x86/64 Generic |
 | 文件系统 | ext4 |
 | 包管理器 | APK |
-| 虚拟机 | QEMU/KVM, VNC 5900, IP 192.168.122.2 |
+| 虚拟机 | QEMU/KVM, VNC 5900, IP 192.168.122.3 |
 
 ## 三种升级方式对比
 
@@ -20,7 +20,7 @@ flowchart LR
         B1[设置本地仓库] --> B2[apk add luci*]
     end
     subgraph C[方式三: sysupgrade]
-        C1[HTTP 提供镜像] --> C2[sysupgrade 升级]
+        C1[SCP 传输镜像] --> C2[sysupgrade 升级]
     end
 ```
 
@@ -40,22 +40,7 @@ flowchart LR
 2. 目标机器有足够的 `/tmp` 空间存放镜像（至少 2x 镜像大小）
 3. 编译机和目标机器网络互通
 
-### 第一步：启动 HTTP 文件服务
-
-在编译机上，进入镜像目录启动 HTTP 服务：
-
-```bash
-cd /opt/project/openwrt/bin/targets/x86/64
-nohup python3 -m http.server 8090 > /tmp/http_server.log 2>&1 &
-```
-
-验证服务可用：
-
-```bash
-curl -sI http://127.0.0.1:8090/
-```
-
-### 第二步：选择正确的镜像
+### 第一步：选择正确的镜像
 
 **⚠️ 关键：必须使用 `combined` 镜像，不能使用 `rootfs` 镜像！**
 
@@ -71,16 +56,20 @@ Image metadata not present
 Invalid image type
 ```
 
+### 第二步：SCP 传输镜像到 VM
+
+将镜像通过 SCP 传输到虚拟机的 `/tmp` 目录：
+
+```bash
+scp /opt/project/openwrt/bin/targets/x86/64/openwrt-x86-64-generic-ext4-combined-efi.img.gz root@192.168.122.3:/tmp/sysupgrade.img.gz
+```
+
+> **为什么用 SCP 而不是 HTTP？** 编译机的后台进程（如 `python3 -m http.server`）在 MCP/SSH 会话间不稳定，SCP 传输更加可靠。
+
 ### 第三步：执行升级
 
 ```bash
-ssh root@192.168.122.2
-
-# 预下载测试（可选）
-wget -O /tmp/test http://192.168.122.1:8090/openwrt-x86-64-generic-ext4-combined.img.gz
-
-# 执行升级
-sysupgrade -v -F http://192.168.122.1:8090/openwrt-x86-64-generic-ext4-combined.img.gz
+ssh root@192.168.122.3 "sysupgrade -v -F /tmp/sysupgrade.img.gz"
 ```
 
 参数说明：
@@ -117,25 +106,25 @@ echo "Qw133133" | su -c "qemu-system-x86_64 \
 
 ```bash
 # 等待系统启动
-for i in $(seq 1 10); do
-  ssh -o ConnectTimeout=3 root@192.168.122.2 "echo OK" 2>/dev/null && break
+for i in $(seq 1 15); do
+  ssh -o ConnectTimeout=3 root@192.168.122.3 "echo OK" 2>/dev/null && break
   sleep 3
 done
 
 # 检查版本
-ssh root@192.168.122.2 "cat /etc/openwrt_release | head -3"
+ssh root@192.168.122.3 "cat /etc/openwrt_release | head -3"
 
 # 检查 LuCI 包
-ssh root@192.168.122.2 "apk list --installed | grep -cE 'luci|uhttpd'"
+ssh root@192.168.122.3 "apk list --installed | grep -cE 'luci|uhttpd'"
 
 # 检查 uhttpd 服务
-ssh root@192.168.122.2 "/etc/init.d/uhttpd status"
+ssh root@192.168.122.3 "/etc/init.d/uhttpd status"
 
 # 检查 Web 端口
-ssh root@192.168.122.2 "netstat -tlnp | grep ':80'"
+ssh root@192.168.122.3 "netstat -tlnp | grep ':80'"
 
 # 访问 Web 界面
-curl -s http://192.168.122.2/ | head -5
+curl -s http://192.168.122.3/ | head -5
 ```
 
 ---
@@ -178,5 +167,5 @@ kill -9 <PID>
 
 **解决**：使用 `-c` 参数保留所有 `/etc/` 修改：
 ```bash
-sysupgrade -c -F http://192.168.122.1:8090/openwrt-x86-64-generic-ext4-combined.img.gz
+ssh root@192.168.122.3 "sysupgrade -c -F /tmp/sysupgrade.img.gz"
 ```

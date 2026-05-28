@@ -16,12 +16,24 @@ var callServiceAction = rpc.declare({
 	params: ['name', 'action']
 });
 
+var callUbusServiceList = rpc.declare({
+	object: 'service',
+	method: 'list',
+	params: ['name']
+});
+
 var SERVICE_DEFINITIONS = [
 	{
 		id: 'dockerd',
 		name: 'Docker',
 		desc: 'Docker容器引擎，用于运行和管理容器化应用',
 		management_link: null
+	},
+	{
+		id: 'adguardhome',
+		name: 'AdGuard Home',
+		desc: 'AdGuard Home DNS广告过滤服务，提供网络级别的广告和跟踪器拦截',
+		management_link: '/cgi-bin/luci/admin/services/adguardhome'
 	}
 ];
 
@@ -31,10 +43,30 @@ function getServiceStatus(service) {
 		if (!svc) {
 			return { running: false, enabled: false };
 		}
-		return {
-			running: svc.running === true,
-			enabled: svc.enabled === true
-		};
+		if (svc.hasOwnProperty('running')) {
+			return {
+				running: svc.running === true,
+				enabled: svc.enabled === true
+			};
+		}
+		return callUbusServiceList(service.id).then(function(svcData) {
+			var svcInfo = svcData[service.id];
+			var running = false;
+			if (svcInfo && svcInfo.instances) {
+				for (var k in svcInfo.instances) {
+					if (svcInfo.instances[k].running === true) {
+						running = true;
+						break;
+					}
+				}
+			}
+			return {
+				running: running,
+				enabled: svc.enabled === true
+			};
+		}).catch(function() {
+			return { running: false, enabled: svc.enabled === true };
+		});
 	}).catch(function() {
 		return { running: false, enabled: false };
 	});

@@ -12,10 +12,11 @@
 make menuconfig
 # 开始编译
 make download -j$(nproc)
-make -j12 V=s 2>&1 | tee build.log
+LDFLAGS="-fuse-ld=lld" make -j12 V=s 2>&1 | tee build.log
 ```
 
 ## 清理缓存
 ```bash
 make clean
 ```
+> 此命令执行后必须从头执行编译步骤，并额外执行`make defconfig`命令

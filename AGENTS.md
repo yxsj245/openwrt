@@ -11,9 +11,18 @@ MCP名称：SSH-MCP_System_compilation 项目目录：/opt/project/openwrt
 ## 虚拟机
 
 > 测试虚拟机 IP 为 `192.168.122.3`，基于 UEFI 固件的 QEMU/KVM x86_64 虚拟机。完整规格及创建命令查阅 [docs/vm-specs.md](docs/vm-specs.md)。
+如果需要端口转发请注意LIBVIRT_FWI 链在默认情况下只允许 RELATED/ESTABLISHED 状态的连接到 VM，新的外部连接被 REJECT 掉。需要将规则提前
 
 ---
 
 ## 服务管理规则
 
 > 任何涉及在 OpenWrt 上部署新程序/服务（如 nginx、samba、frp 等）时，**必须**使用 IDE 弹窗询问用户是否需要将其加入 LuCI 服务管理页面统一管理。具体实现方式查阅 [docs/services.md](docs/services.md)。
+
+---
+
+## OP 虚拟机调试规则
+
+> 当 OpenWrt 虚拟机（192.168.122.3）上的 Web 页面或服务表现不符合预期时，遵循 [docs/debugging.md](docs/debugging.md) 中的调试管线进行排查。核心原则：
+> - **禁止**直接在 VM 上改文件（ash 转义问题），必须走 IDE → 编译机 → scp → VM 管线
+> - 页面异常时 **优先排查浏览器缓存**（添加视觉标记 + 强制刷新验证）
