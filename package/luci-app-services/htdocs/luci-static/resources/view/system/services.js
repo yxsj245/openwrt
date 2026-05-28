@@ -34,12 +34,6 @@ var SERVICE_DEFINITIONS = [
 		name: 'AdGuard Home',
 		desc: 'AdGuard Home DNS广告过滤服务，提供网络级别的广告和跟踪器拦截',
 		management_link: '/cgi-bin/luci/admin/services/adguardhome'
-	},
-	{
-		id: 'clientlimit',
-		name: '客户端限速',
-		desc: '基于 nftables 的客户端带宽限速服务，可对局域网内各客户端设置独立的上下行速率限制',
-		management_link: '/cgi-bin/luci/admin/services/clientlimit'
 	}
 ];
 

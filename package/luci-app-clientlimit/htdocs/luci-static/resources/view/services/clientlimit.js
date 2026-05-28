@@ -16,7 +16,7 @@ return view.extend({
 		m = new form.Map('clientlimit', _('客户端带宽限速'),
 			_('基于 nftables 的客户端带宽限速管理，支持对局域网内每个 IP 设置独立的上下行限速。'));
 
-		s = m.section(form.NamedSection, 'settings', 'clientlimit');
+		s = m.section(form.NamedSection, 'settings', 'settings');
 		s.anonymous = false;
 		s.addremove = false;
 

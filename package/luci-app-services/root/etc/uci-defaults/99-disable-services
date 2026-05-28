@@ -7,8 +7,4 @@
 	/etc/init.d/adguardhome stop 2>/dev/null
 	/etc/init.d/adguardhome disable 2>/dev/null
 }
-[ -x /etc/init.d/clientlimit ] && {
-	/etc/init.d/clientlimit stop 2>/dev/null
-	/etc/init.d/clientlimit disable 2>/dev/null
-}
 exit 0

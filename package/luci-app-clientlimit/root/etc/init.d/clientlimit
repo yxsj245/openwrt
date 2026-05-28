@@ -58,12 +58,18 @@ cleanup() {
 }
 
 start_service() {
-	apply_rules && {
-		procd_open_instance
-		procd_set_param command /bin/busybox sleep 365d
-		procd_set_param respawn
-		procd_close_instance
-	}
+	local _settings_enabled
+	config_load clientlimit
+	config_foreach _check_settings settings
+
+	if [ "$_settings_enabled" = "1" ]; then
+		apply_rules
+	fi
+
+	procd_open_instance
+	procd_set_param command /bin/busybox sleep 365d
+	procd_set_param respawn
+	procd_close_instance
 }
 
 stop_service() {
@@ -72,12 +78,13 @@ stop_service() {
 
 reload_service() {
 	cleanup
-	apply_rules && {
-		procd_open_instance
-		procd_set_param command /bin/busybox sleep 365d
-		procd_set_param respawn
-		procd_close_instance
-	}
+	local _settings_enabled
+	config_load clientlimit
+	config_foreach _check_settings settings
+
+	if [ "$_settings_enabled" = "1" ]; then
+		apply_rules
+	fi
 }
 
 service_triggers() {

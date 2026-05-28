@@ -9,3 +9,5 @@ PKG_RELEASE:=1
 PKG_MAINTAINER:=OpenWrt Developer
 
 include ../../feeds/luci/luci.mk
+
+# call BuildPackage - OpenWrt buildroot signature

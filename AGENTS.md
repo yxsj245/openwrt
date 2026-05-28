@@ -5,7 +5,6 @@ MCP名称：SSH-MCP_System_compilation 项目目录：/opt/project/openwrt
 2. 涉及编译相关的操作，请你告诉我命令一般情况由我自己去执行。如果编译机没有虚拟机的话旧执行完毕后请务必在机器上启动一个虚拟机并开启VNC方便我进行测试，如果编译机已经存在已有的虚拟机时请编译后连接进去使用sysupgrade升级，当前openwrt虚拟机IP是192.168.122.3，参考[UPGRADE](docs\UPGRADE.md)。由于你没有视觉所以你不能通关VNC截图进行查看，只能通过命令行进行操作。比
 3. 代码会自动实时同步到编译机，所有代码编写修改操作必须在当前IDE中进行，一般情况除调试外不能再其他地方进行修改。您也不需要使用MCP的上传工具手动同步代码。当然你需要编写后去机器上验证文件是否同步 如果没有同步可以使用MCP手动上传文件。
 4. OpenWrt 的 make 实际读取的是 .config为了方便读取我在IDE上加他重命名了为config-temp，所以修改config-temp这个文件之后需要去编译机上进行替换操作，然后需执行`make defconfig`命令更新配置文件，这两步由你来直接帮我操作了。
-5. 由于本机是Windows，涉及Luci服务的编写如果遇到没有把包编译进去的问题可能是换行符问题
 
 ---
 
@@ -27,3 +26,14 @@ MCP名称：SSH-MCP_System_compilation 项目目录：/opt/project/openwrt
 > 当 OpenWrt 虚拟机（192.168.122.3）上的 Web 页面或服务表现不符合预期时，遵循 [docs/debugging.md](docs/debugging.md) 中的调试管线进行排查。核心原则：
 > - **禁止**直接在 VM 上改文件（ash 转义问题），必须走 IDE → 编译机 → scp → VM 管线
 > - 页面异常时 **优先排查浏览器缓存**（添加视觉标记 + 强制刷新验证）
+
+---
+
+## LuCI 应用包开发规范
+
+> 编写新的 `luci-app-*` 包时，**必须**先阅读 [docs/luci-app-development.md](docs/luci-app-development.md)。该文档记录了导致「包不被编译系统识别」「服务始终显示已停止」「LuCI 页面无法显示配置项」等问题的常见根因及规范写法，包括：
+> - Makefile 必须包含 `BuildPackage` 签名行
+> - 所有关键文件必须使用 LF 换行符
+> - init.d 脚本必须始终向 procd 注册实例
+> - UCI section 命名必须与 LuCI JS `NamedSection` 匹配
+> - init.d 脚本文件权限

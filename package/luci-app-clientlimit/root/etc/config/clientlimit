@@ -1,4 +1,4 @@
-config settings
+config settings 'settings'
 	option enabled '0'
 	list lan_interfaces 'lan'
 

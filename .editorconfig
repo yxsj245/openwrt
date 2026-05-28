@@ -1,0 +1,23 @@
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+
+[Makefile]
+end_of_line = lf
+
+[*.mk]
+end_of_line = lf
+
+[*.sh]
+end_of_line = lf
+
+[*.js]
+end_of_line = lf
+
+[*.json]
+end_of_line = lf
+
+[*.conf]
+end_of_line = lf
