@@ -1,0 +1,11 @@
+{
+	"luci-app-clientlimit": {
+		"description": "Grant UCI access for luci-app-clientlimit",
+		"read": {
+			"uci": [ "clientlimit" ]
+		},
+		"write": {
+			"uci": [ "clientlimit" ]
+		}
+	}
+}
