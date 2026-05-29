@@ -1,7 +1,0 @@
-config settings 'settings'
-	option enabled '0'
-
-config status 'status'
-	option running '0'
-	option version ''
-	option pid '0'

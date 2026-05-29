@@ -1,0 +1,138 @@
+--- a/root/usr/share/ucode/fw4.uc
++++ b/root/usr/share/ucode/fw4.uc
+@@ -488,6 +488,24 @@
+ 
+ 	return (rc == 0);
+ }
++function nft_try_fullcone() {
++	let nft_test =
++		'add table inet fw4-fullcone-test; ' +
++		'add chain inet fw4-fullcone-test dstnat { ' +
++		'type nat hook prerouting priority -100; policy accept; ' +
++		'fullcone; ' +
++		'}; ' +
++		'add chain inet fw4-fullcone-test srcnat { ' +
++		'type nat hook postrouting priority -100; policy accept; ' +
++		'fullcone; ' +
++		'}; ';
++	let cmd = sprintf("/usr/sbin/nft -c '%s' 2>/dev/null", replace(nft_test, "'", "'\\''"));
++	let ok = system(cmd) == 0;
++	if (!ok) {
++		warn("nft_try_fullcone: "+ cmd + "\n");
++	}
++	return ok;
++}
+ 
+ 
+ return {
+@@ -855,6 +873,18 @@
+ 			warn(`[!] ${msg}\n`);
+ 	},
+ 
++myinfo: function(fmt, ...args) {
++		if (getenv("QUIET"))
++			return;
++
++		let msg = sprintf(fmt, ...args);
++
++		if (getenv("TTY"))
++			warn(`\033[32m${msg}\033[m\n`);
++		else
++			warn(`[I] ${msg}\n`);
++	},
++
+ 	get: function(sid, opt) {
+ 		return this.cursor.get("firewall", sid, opt);
+ 	},
+@@ -1036,6 +1066,21 @@
+ 		}
+ 	},
+ 
++myinfo_section: function(s, msg) {
++		if (s[".name"]) {
++			if (s.name)
++				this.myinfo("Section %s (%s) %s", this.section_id(s[".name"]), s.name, msg);
++			else
++				this.myinfo("Section %s %s", this.section_id(s[".name"]), msg);
++		}
++		else {
++			if (s.name)
++				this.myinfo("ubus %s (%s) %s", s.type || "rule", s.name, msg);
++			else
++				this.myinfo("ubus %s %s", s.type || "rule", msg);
++		}
++	},
++
+ 	parse_policy: function(val) {
+ 		return this.parse_enum(val, [
+ 			"accept",
+@@ -1475,6 +1520,7 @@
+ 			"dnat",
+ 			"snat",
+ 			"masquerade",
++			"fullcone",
+ 			"accept",
+ 			"reject",
+ 			"drop"
+@@ -1972,6 +2018,8 @@
+ 			flow_offloading: [ "bool", "0" ],
+ 			flow_offloading_hw: [ "bool", "0" ],
+ 
++			fullcone: [ "bool", "0" ],
++
+ 			auto_includes: [ "bool", "1" ]
+ 		});
+ 
+@@ -1980,6 +2028,11 @@
+ 
+ 		delete defs.syn_flood;
+ 
++		if (!nft_try_fullcone()) {
++			delete defs.fullcone;
++			warn("nft_try_fullcone failed, disable fullcone globally\n");
++		}
++
+ 		this.state.defaults = defs;
+ 	},
+ 
+@@ -2005,6 +2058,9 @@
+ 
+ 			masq6: [ "bool" ],
+ 
++			fullcone4: [ "bool", "0" ],
++			fullcone6: [ "bool", "0" ],
++
+ 			extra: [ "string", null, UNSUPPORTED ],
+ 			extra_src: [ "string", null, UNSUPPORTED ],
+ 			extra_dest: [ "string", null, UNSUPPORTED ],
+@@ -2036,6 +2092,18 @@
+ 			}
+ 		}
+ 
++		if (this.state.defaults && !this.state.defaults.fullcone) {
++			this.warn_section(data, "fullcone in defaults not enabled, ignore zone fullcone settings");
++			zone.fullcone4 = false;
++			zone.fullcone6 = false;
++		}
++		if (zone.fullcone4) {
++			this.myinfo_section(data, "IPv4 fullcone enabled for zone '" + zone.name + "'");
++		}
++		if (zone.fullcone6) {
++			this.myinfo_section(data, "IPv6 fullcone enabled for zone '" + zone.name + "'");
++		}
++
+ 		if (zone.mtu_fix && this.kernel < 0x040a0000) {
+ 			this.warn_section(data, "option 'mtu_fix' requires kernel 4.10 or later");
+ 			return;
+@@ -2205,6 +2273,11 @@
+ 		zone.related_subnets = related_subnets;
+ 		zone.related_physdevs = related_physdevs;
+ 
++		if (zone.fullcone4 || zone.fullcone6) {
++			zone.dflags.snat = true;
++			zone.dflags.dnat = true;
++		}
++
+ 		if (zone.masq || zone.masq6)
+ 			zone.dflags.snat = true;
+ 

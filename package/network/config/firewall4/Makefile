@@ -46,6 +46,7 @@ define Package/firewall4/install
 endef
 
 define Build/Compile
+	$(if $(CONFIG_PACKAGE_kmod-nft-fullcone),mkdir -p $(PKG_BUILD_DIR)/root/usr/share/firewall4/templates; $(CP) ./files/root/usr/share/firewall4/templates/zone-fullcone.uc $(PKG_BUILD_DIR)/root/usr/share/firewall4/templates/)
 endef
 
 $(eval $(call BuildPackage,firewall4))
