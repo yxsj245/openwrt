@@ -35,12 +35,7 @@ var SERVICE_DEFINITIONS = [
 		desc: 'AdGuard Home DNS广告过滤服务，提供网络级别的广告和跟踪器拦截',
 		management_link: '/cgi-bin/luci/admin/services/adguardhome'
 	},
-	{
-		id: 'uuplugin',
-		name: 'UU Game Booster',
-		desc: '网易UU加速器路由器插件，为PS5/Xbox/Switch/PC等设备提供游戏加速',
-		management_link: '/cgi-bin/luci/admin/services/uugamebooster'
-	}
+
 ];
 
 function getServiceStatus(service) {
