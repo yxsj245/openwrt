@@ -40,6 +40,24 @@ draw_version() {
 	fi
 }
 
+has_i226v() {
+	for d in /sys/class/net/eth*; do
+		[ -d "$d" ] || continue
+		local vendor=$(cat "${d}/device/vendor" 2>/dev/null)
+		local device=$(cat "${d}/device/device" 2>/dev/null)
+		[ "$vendor" = "0x8086" ] && [ "$device" = "0x125c" ] && return 0
+	done
+	return 1
+}
+
+draw_hardware_info() {
+	if has_i226v; then
+		echo ""
+		echo "  Hardware: Intel i226-V 2.5G detected"
+		echo "  NIC tuning: Low-latency gaming profile applied"
+	fi
+}
+
 get_iface_speed() {
 	local iface="$1"
 	local speed=""
@@ -183,6 +201,7 @@ draw_footer() {
 main_menu_loop() {
 	draw_header
 	draw_version
+	draw_hardware_info
 	draw_network_list
 	draw_footer
 
@@ -194,6 +213,7 @@ main_menu_loop() {
 			[Rr])
 				draw_header
 				draw_version
+				draw_hardware_info
 				draw_network_list
 				draw_footer
 				;;
@@ -204,6 +224,7 @@ main_menu_loop() {
 				handle_numeric_choice "$choice"
 				draw_header
 				draw_version
+				draw_hardware_info
 				draw_network_list
 				draw_footer
 				;;
