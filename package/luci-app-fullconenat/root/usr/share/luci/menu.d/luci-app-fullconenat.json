@@ -1,0 +1,13 @@
+{
+	"admin/network/fullconenat": {
+		"title": "全锥型 NAT",
+		"order": 50,
+		"action": {
+			"type": "view",
+			"path": "fullconenat/fullconenat"
+		},
+		"depends": {
+			"acl": [ "luci-app-fullconenat" ]
+		}
+	}
+}

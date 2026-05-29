@@ -23,6 +23,11 @@ PKG_BUILD_FLAGS:=lto
 
 include $(INCLUDE_DIR)/package.mk
 
+define Build/Prepare
+	$(call Build/Prepare/Default,)
+	rm -f $(PKG_BUILD_DIR)/src/parser_bison.c $(PKG_BUILD_DIR)/src/scanner.c
+endef
+
 DISABLE_NLS:=
 
 CONFIGURE_ARGS += \
