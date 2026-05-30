@@ -106,6 +106,7 @@ define Device/Default
   IMAGE/combined.vdi := grub-config pc | combined | grub-install | qemu-image vdi
   IMAGE/combined.vmdk := grub-config pc | combined | grub-install | qemu-image vmdk
   IMAGE/combined.vhdx := grub-config pc | combined | grub-install | qemu-image vhdx -o subformat=dynamic
+  IMAGE/combined.qcow2 := grub-config pc | combined | grub-install | qemu-image qcow2
   IMAGE/rootfs.img := append-rootfs | pad-to $(ROOTFS_PARTSIZE)
   IMAGE/rootfs.img.gz := append-rootfs | pad-to $(ROOTFS_PARTSIZE) | gzip
   ARTIFACT/image-efi.iso := grub-config iso | iso efi
@@ -114,6 +115,7 @@ define Device/Default
   IMAGE/combined-efi.vdi := grub-config efi | combined efi | grub-install efi | qemu-image vdi
   IMAGE/combined-efi.vmdk := grub-config efi | combined efi | grub-install efi | qemu-image vmdk
   IMAGE/combined-efi.vhdx := grub-config efi | combined efi | grub-install efi | qemu-image vhdx -o subformat=dynamic
+  IMAGE/combined-efi.qcow2 := grub-config efi | combined efi | grub-install efi | qemu-image qcow2
   ifeq ($(CONFIG_TARGET_IMAGES_GZIP),y)
     IMAGES-y := rootfs.img.gz
     IMAGES-$$(CONFIG_GRUB_IMAGES) += combined.img.gz
@@ -141,6 +143,10 @@ define Device/Default
   ifeq ($(CONFIG_VHDX_IMAGES),y)
     IMAGES-$$(CONFIG_GRUB_IMAGES) += combined.vhdx
     IMAGES-$$(CONFIG_GRUB_EFI_IMAGES) += combined-efi.vhdx
+  endif
+  ifeq ($(CONFIG_QCOW2_IMAGES),y)
+    IMAGES-$$(CONFIG_GRUB_IMAGES) += combined.qcow2
+    IMAGES-$$(CONFIG_GRUB_EFI_IMAGES) += combined-efi.qcow2
   endif
   IMAGES := $$(IMAGES-y)
   ARTIFACTS := $$(ARTIFACTS-y)

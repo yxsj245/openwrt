@@ -309,6 +309,12 @@ menu "Target Images"
 		depends on GRUB_IMAGES || GRUB_EFI_IMAGES
 		select PACKAGE_kmod-e1000
 
+	config QCOW2_IMAGES
+		bool "Build QCOW2 image files (QEMU/KVM)"
+		depends on TARGET_x86
+		depends on GRUB_IMAGES || GRUB_EFI_IMAGES
+		select PACKAGE_kmod-e1000
+
 	config TARGET_SERIAL
 		string "Serial port device"
 		depends on TARGET_x86 || TARGET_armsr || TARGET_loongarch64

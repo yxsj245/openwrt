@@ -10,6 +10,10 @@ MCP名称：SSH-MCP_System_compilation 项目目录：/opt/project/openwrt
 
 ---
 
+## 兼容性
+当前分支是主打虚拟机的兼容性，不需要考虑其他设备，兼容VMware、KVM，Docker等虚拟机。
+
+
 ## 虚拟机
 
 > 测试虚拟机 IP 为 `192.168.122.3`，基于 UEFI 固件的 QEMU/KVM x86_64 虚拟机。完整规格及创建命令查阅 [docs/vm-specs.md](docs/vm-specs.md)。
