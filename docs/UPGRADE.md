@@ -72,6 +72,8 @@ scp /opt/project/openwrt/bin/targets/x86/64/openwrt-x86-64-generic-ext4-combined
 ssh root@192.168.122.3 "sysupgrade -v -F /tmp/sysupgrade.img.gz"
 ```
 
+> **Docker 持久化分区注意事项：** 不要添加 `-p` 参数。x86 平台默认保留现有分区表，额外的 `docker_data` 分区不会被普通 sysupgrade 写入；`-p` 会关闭该保留逻辑。完整配置与验证方法见 [docker-persistence.md](docker-persistence.md)。
+
 参数说明：
 
 | 参数 | 作用 |
@@ -122,6 +124,10 @@ ssh root@192.168.122.3 "/etc/init.d/uhttpd status"
 
 # 检查 Web 端口
 ssh root@192.168.122.3 "netstat -tlnp | grep ':80'"
+
+# 检查 Docker 持久化分区（已配置时）
+ssh root@192.168.122.3 "mount | grep ' on /opt/docker '"
+ssh root@192.168.122.3 "docker ps -a"
 
 # 访问 Web 界面
 curl -s http://192.168.122.3/ | head -5

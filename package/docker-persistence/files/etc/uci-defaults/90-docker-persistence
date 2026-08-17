@@ -1,0 +1,41 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+DATA_LABEL="docker_data"
+DATA_ROOT="$(uci -q get dockerd.globals.data_root)"
+DATA_ROOT="${DATA_ROOT:-/opt/docker}"
+DATA_ROOT="${DATA_ROOT%/}"
+
+find_data_device() {
+	block info 2>/dev/null | sed -n "s#^\([^:]*\):.*LABEL=\"${DATA_LABEL}\".*#\1#p" | head -n 1
+}
+
+remove_conflicting_mount() {
+	local section="$1"
+	local target
+
+	config_get target "$section" target
+	[ "${target%/}" = "$DATA_ROOT" ] || return 0
+	[ "$section" = "docker_data" ] || uci -q delete "fstab.$section"
+}
+
+DATA_DEVICE="$(find_data_device)"
+[ -n "$DATA_DEVICE" ] || exit 0
+
+config_load fstab
+config_foreach remove_conflicting_mount mount
+
+uci -q batch <<EOF
+set fstab.docker_data='mount'
+set fstab.docker_data.target='$DATA_ROOT'
+set fstab.docker_data.label='$DATA_LABEL'
+set fstab.docker_data.fstype='ext4'
+set fstab.docker_data.options='rw,noatime'
+set fstab.docker_data.enabled='1'
+set fstab.docker_data.enabled_fsck='1'
+EOF
+uci commit fstab
+
+mkdir -p "$DATA_ROOT"
+exit 0

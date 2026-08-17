@@ -7657,6 +7657,7 @@ CONFIG_PACKAGE_containerd=y
 # CONFIG_PACKAGE_dmidecode is not set
 CONFIG_PACKAGE_docker=y
 CONFIG_PACKAGE_docker-compose=y
+CONFIG_PACKAGE_docker-persistence=y
 CONFIG_PACKAGE_dockerd=y
 # CONFIG_DOCKER_CHECK_CONFIG is not set
 # CONFIG_DOCKER_CGROUP_OPTIONS is not set

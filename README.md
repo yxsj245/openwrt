@@ -12,7 +12,7 @@
 make menuconfig
 # 开始编译
 make download -j$(nproc)
-LDFLAGS="-fuse-ld=lld" make -j12 V=s 2>&1 | tee build.log
+LDFLAGS="-fuse-ld=lld" make -j$(nproc) V=s 2>&1 | tee build.log
 ```
 
 ## 清理缓存
