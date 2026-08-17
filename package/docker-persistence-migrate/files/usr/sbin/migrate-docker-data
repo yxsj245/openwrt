@@ -1,0 +1,161 @@
+#!/bin/sh
+
+set -eu
+
+export IPKG_INSTROOT="${IPKG_INSTROOT:-}"
+
+DATA_LABEL="${DOCKER_DATA_LABEL:-docker_data}"
+DATA_DEVICE="${1:-}"
+DATA_ROOT="$(uci -q get dockerd.globals.data_root)"
+DATA_ROOT="${DATA_ROOT:-/opt/docker}"
+DATA_ROOT="${DATA_ROOT%/}"
+BACKUP_DIR="/root/docker-persistence-backup-$(date +%Y%m%d-%H%M%S)"
+MIGRATION_MOUNT="/tmp/docker-persistence-migrate"
+DOCKER_WAS_RUNNING=0
+FSTAB_CHANGED=0
+TARGET_MOUNTED=0
+SUCCESS=0
+
+log() {
+	printf '%s\n' "$*"
+}
+
+fail() {
+	log "错误：$*" >&2
+	exit 1
+}
+
+mounted_source() {
+	awk -v target="$1" '$2 == target { print $1; exit }' /proc/mounts
+}
+
+restore_on_error() {
+	[ "$SUCCESS" -eq 1 ] && return 0
+	trap - EXIT
+	set +e
+
+	log "迁移未完成，正在恢复原 Docker 数据目录。"
+	/etc/init.d/dockerd stop >/dev/null 2>&1
+
+	if [ "$TARGET_MOUNTED" -eq 1 ] && [ "$(mounted_source "$DATA_ROOT")" = "$DATA_DEVICE" ]; then
+		umount "$DATA_ROOT" >/dev/null 2>&1
+	fi
+
+	if [ -f "$BACKUP_DIR/fstab" ] && [ "$FSTAB_CHANGED" -eq 1 ]; then
+		cp -p "$BACKUP_DIR/fstab" /etc/config/fstab
+	fi
+
+	umount "$MIGRATION_MOUNT" >/dev/null 2>&1
+	rmdir "$MIGRATION_MOUNT" >/dev/null 2>&1
+
+	[ "$DOCKER_WAS_RUNNING" -eq 1 ] && /etc/init.d/dockerd start >/dev/null 2>&1
+	log "回滚已完成，配置备份位于 $BACKUP_DIR。"
+	exit 1
+}
+
+trap restore_on_error EXIT
+
+[ -n "$DATA_DEVICE" ] || fail "用法：migrate-docker-data <ext4-data-device>"
+[ -b "$DATA_DEVICE" ] || fail "设备不存在：$DATA_DEVICE"
+
+for command_name in block rsync tune2fs uci mount umount awk; do
+	command -v "$command_name" >/dev/null 2>&1 || fail "缺少命令：$command_name"
+done
+
+BLOCK_INFO="$(block info "$DATA_DEVICE" 2>/dev/null || true)"
+printf '%s\n' "$BLOCK_INFO" | grep -q 'TYPE="ext4"' || fail "目标分区不是 ext4：$DATA_DEVICE"
+
+CURRENT_DEVICE_MOUNT="$(awk -v device="$DATA_DEVICE" '$1 == device { print $2; exit }' /proc/mounts)"
+[ -z "$CURRENT_DEVICE_MOUNT" ] || fail "目标分区已经挂载到：$CURRENT_DEVICE_MOUNT"
+
+[ -d "$DATA_ROOT" ] || fail "Docker 数据目录不存在：$DATA_ROOT"
+[ "$(mounted_source /)" != "$DATA_DEVICE" ] || fail "目标分区是当前根分区"
+
+mkdir -p "$BACKUP_DIR"
+cp -p /etc/config/fstab "$BACKUP_DIR/fstab"
+[ -f /etc/config/dockerd ] && cp -p /etc/config/dockerd "$BACKUP_DIR/dockerd"
+block info >"$BACKUP_DIR/block-info.txt"
+docker ps -a --no-trunc >"$BACKUP_DIR/docker-ps.txt"
+
+if /etc/init.d/dockerd status >/dev/null 2>&1; then
+	DOCKER_WAS_RUNNING=1
+	log "正在停止 Docker 服务……"
+	/etc/init.d/dockerd stop
+fi
+
+sleep 2
+if docker info >/dev/null 2>&1; then
+	fail "Docker 服务仍在运行"
+fi
+
+DATA_MOUNT_SOURCE="$(mounted_source "$DATA_ROOT")"
+ROOT_MOUNT_SOURCE="$(mounted_source /)"
+if [ -n "$DATA_MOUNT_SOURCE" ] && [ "$DATA_MOUNT_SOURCE" = "$ROOT_MOUNT_SOURCE" ]; then
+	log "正在解除 Docker 创建的数据目录绑定挂载……"
+	umount "$DATA_ROOT"
+fi
+
+if grep -q " $DATA_ROOT/\? " /proc/mounts; then
+	fail "Docker 数据目录仍有活动挂载，请检查残留容器挂载"
+fi
+
+log "正在设置文件系统标签：$DATA_LABEL"
+tune2fs -L "$DATA_LABEL" "$DATA_DEVICE"
+
+mkdir -p "$MIGRATION_MOUNT"
+mount -t ext4 -o rw,noatime "$DATA_DEVICE" "$MIGRATION_MOUNT"
+
+log "正在复制 Docker 数据到 $DATA_DEVICE……"
+rsync -aHAX --numeric-ids --delete --exclude='/lost+found' "$DATA_ROOT/" "$MIGRATION_MOUNT/"
+
+VERIFY_OUTPUT="$(rsync -aHAXnc --numeric-ids --delete --itemize-changes --exclude='/lost+found' "$DATA_ROOT/" "$MIGRATION_MOUNT/")"
+[ -z "$VERIFY_OUTPUT" ] || fail "复制校验发现差异"
+sync
+
+umount "$MIGRATION_MOUNT"
+rmdir "$MIGRATION_MOUNT"
+
+set +u
+. /lib/functions.sh
+remove_conflicting_mount() {
+	local section="$1"
+	local target
+
+	config_get target "$section" target
+	[ "${target%/}" = "$DATA_ROOT" ] || return 0
+	[ "$section" = "docker_data" ] || uci -q delete "fstab.$section"
+}
+
+config_load fstab
+config_foreach remove_conflicting_mount mount
+set -u
+
+uci -q batch <<EOF
+set fstab.docker_data='mount'
+set fstab.docker_data.target='$DATA_ROOT'
+set fstab.docker_data.label='$DATA_LABEL'
+set fstab.docker_data.fstype='ext4'
+set fstab.docker_data.options='rw,noatime'
+set fstab.docker_data.enabled='1'
+set fstab.docker_data.enabled_fsck='1'
+EOF
+uci commit fstab
+FSTAB_CHANGED=1
+
+mkdir -p "$DATA_ROOT"
+mount -t ext4 -o rw,noatime "$DATA_DEVICE" "$DATA_ROOT"
+TARGET_MOUNTED=1
+
+[ "$(mounted_source "$DATA_ROOT")" = "$DATA_DEVICE" ] || fail "持久化分区挂载校验失败"
+
+if [ "$DOCKER_WAS_RUNNING" -eq 1 ]; then
+	log "正在启动 Docker 服务……"
+	/etc/init.d/dockerd start
+	sleep 3
+	docker info >/dev/null 2>&1 || fail "Docker 启动校验失败"
+fi
+
+SUCCESS=1
+trap - EXIT
+log "迁移完成：$DATA_DEVICE 已挂载到 $DATA_ROOT。"
+log "原数据仍保留在系统分区挂载点下方，配置备份位于 $BACKUP_DIR。"

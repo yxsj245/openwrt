@@ -29,13 +29,6 @@ var SERVICE_DEFINITIONS = [
 		desc: 'Docker容器引擎，用于运行和管理容器化应用',
 		management_link: null
 	},
-	{
-		id: 'adguardhome',
-		name: 'AdGuard Home',
-		desc: 'AdGuard Home DNS广告过滤服务，提供网络级别的广告和跟踪器拦截',
-		management_link: '/cgi-bin/luci/admin/services/adguardhome'
-	},
-
 ];
 
 function getServiceStatus(service) {

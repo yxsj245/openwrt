@@ -3,8 +3,4 @@
 	/etc/init.d/dockerd stop 2>/dev/null
 	/etc/init.d/dockerd disable 2>/dev/null
 }
-[ -x /etc/init.d/adguardhome ] && {
-	/etc/init.d/adguardhome stop 2>/dev/null
-	/etc/init.d/adguardhome disable 2>/dev/null
-}
 exit 0

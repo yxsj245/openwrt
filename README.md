@@ -9,16 +9,18 @@
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 cp config-temp .config
-# 修改编译参数 二选一
-make menuconfig # 交互式菜单
-make defconfig # 自动补全配置
+# 根据当前源码补全配置
+make defconfig
+# 如需交互式调整编译参数
+make menuconfig
 # 开始编译
 make download -j$(nproc)
-LDFLAGS="-fuse-ld=lld" make -j$(nproc) V=s 2>&1 | tee build.log
+set -o pipefail
+LDFLAGS="-fuse-ld=lld" make -j"$(nproc)" V=s 2>&1 | tee build.log
 ```
 
 ## 清理缓存
 ```bash
 make clean
 ```
-> 此命令执行后必须从头执行编译步骤
+> 此命令执行后必须从头执行编译步骤，并重新执行 `make defconfig`

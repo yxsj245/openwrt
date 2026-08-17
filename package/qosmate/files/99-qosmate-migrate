@@ -1,0 +1,80 @@
+#!/bin/sh
+
+migrate_sqm() {
+	local section interface download upload
+
+	section="$(uci -q show sqm | sed -n 's/^sqm\.\([^.=]*\)=queue$/\1/p' | head -n 1)"
+	[ -n "$section" ] || return 0
+
+	interface="$(uci -q get "sqm.${section}.interface")"
+	download="$(uci -q get "sqm.${section}.download")"
+	upload="$(uci -q get "sqm.${section}.upload")"
+
+	[ -n "$interface" ] && uci set "qosmate.settings.WAN=${interface}"
+	case "$download" in ''|*[!0-9]*) ;; *) [ "$download" -gt 0 ] && uci set "qosmate.settings.DOWNRATE=${download}" ;; esac
+	case "$upload" in ''|*[!0-9]*) ;; *) [ "$upload" -gt 0 ] && uci set "qosmate.settings.UPRATE=${upload}" ;; esac
+}
+
+migrate_client_limits() {
+	local global_enabled section enabled name ip download upload target
+
+	global_enabled="$(uci -q get clientlimit.settings.enabled)"
+	[ "$global_enabled" = "1" ] || return 0
+
+	for section in $(uci -q show clientlimit | sed -n 's/^clientlimit\.\([^.=]*\)=client$/\1/p'); do
+		enabled="$(uci -q get "clientlimit.${section}.enabled")"
+		[ "$enabled" = "1" ] || continue
+
+		name="$(uci -q get "clientlimit.${section}.name")"
+		ip="$(uci -q get "clientlimit.${section}.ip")"
+		download="$(uci -q get "clientlimit.${section}.download")"
+		upload="$(uci -q get "clientlimit.${section}.upload")"
+		[ -n "$ip" ] || continue
+
+		case "$download" in ''|*[!0-9]*) download=0 ;; esac
+		case "$upload" in ''|*[!0-9]*) upload=0 ;; esac
+		[ "$download" -gt 0 ] || [ "$upload" -gt 0 ] || continue
+
+		target="$(uci add qosmate ratelimit)" || continue
+		uci set "qosmate.${target}.name=${name:-${ip}}"
+		uci add_list "qosmate.${target}.target=${ip}"
+		uci set "qosmate.${target}.enabled=1"
+		uci set "qosmate.${target}.download_limit=$((download * 8))"
+		uci set "qosmate.${target}.upload_limit=$((upload * 8))"
+		uci set "qosmate.${target}.burst_factor=1.0"
+	done
+}
+
+if [ "$(uci -q get qosmate.global.migration_done)" != "1" ]; then
+	migrate_sqm
+	migrate_client_limits
+	uci set qosmate.settings.ROOT_QDISC='cake'
+	uci set qosmate.global.enabled='1'
+	uci set qosmate.global.migration_done='1'
+	uci commit qosmate
+fi
+
+/etc/init.d/clientlimit stop 2>/dev/null
+/etc/init.d/clientlimit disable 2>/dev/null
+/etc/init.d/sqm stop 2>/dev/null
+/etc/init.d/sqm disable 2>/dev/null
+nft delete table inet clientlimit 2>/dev/null
+
+rm -f \
+	/etc/config/clientlimit \
+	/etc/config/sqm \
+	/etc/init.d/clientlimit \
+	/etc/init.d/sqm \
+	/usr/share/luci/menu.d/luci-app-clientlimit.json \
+	/usr/share/rpcd/acl.d/luci-app-clientlimit.json \
+	/www/luci-static/resources/view/services/clientlimit.js \
+	/usr/share/luci/menu.d/luci-app-sqm.json \
+	/usr/share/rpcd/acl.d/luci-app-sqm.json \
+	/www/luci-static/resources/view/network/sqm.js
+
+rm -f /tmp/luci-indexcache.*
+rm -rf /tmp/luci-modulecache
+/etc/init.d/rpcd reload 2>/dev/null
+
+/etc/init.d/qosmate enable
+exit 0
