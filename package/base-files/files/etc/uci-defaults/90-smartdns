@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# 仅初始化一次，避免固件升级覆盖用户在 LuCI 中保存的设置。
+[ "$(uci -q get smartdns.@smartdns[0].openwrt_defaults_version)" = "1" ] && exit 0
+
+uci -q batch <<'EOF'
+set smartdns.@smartdns[0].enabled='1'
+set smartdns.@smartdns[0].port='6053'
+set smartdns.@smartdns[0].auto_set_dnsmasq='1'
+set smartdns.@smartdns[0].openwrt_defaults_version='1'
+commit smartdns
+EOF
+
+exit 0
