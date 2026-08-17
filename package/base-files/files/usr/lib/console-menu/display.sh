@@ -51,10 +51,18 @@ has_i226v() {
 }
 
 draw_hardware_info() {
+	local profile profile_name
+
 	if has_i226v; then
+		profile=$(uci -q get nic-tuning.settings.profile 2>/dev/null)
+		case "$profile" in
+			low-latency) profile_name="低延迟" ;;
+			throughput) profile_name="吞吐优先" ;;
+			*) profile_name="均衡" ;;
+		esac
 		echo ""
-		echo "  Hardware: Intel i226-V 2.5G detected"
-		echo "  NIC tuning: Low-latency gaming profile applied"
+		echo "  硬件: 已检测到 Intel i226-V 2.5G"
+		echo "  网卡调优: ${profile_name}模式"
 	fi
 }
 

@@ -1,0 +1,8 @@
+config settings 'settings'
+	option enabled '1'
+	option profile 'balanced'
+	option irq_mode 'irqbalance'
+
+	# 可选覆盖项；留空时使用所选模式的安全默认值
+	# option queue_count '4'
+	# option ring_size '1024'

@@ -34,6 +34,27 @@ GRUB_TITLE:=$(call qstrip,$(CONFIG_GRUB_TITLE))
 
 BOOTOPTS:=$(call qstrip,$(CONFIG_GRUB_BOOTOPTS))
 
+EARLY_UCODE_FILE:=$(STAGING_DIR_ROOT)/lib/firmware/intel-ucode/06-96-01
+GRUB_EARLY_INITRD:=$(if $(CONFIG_PACKAGE_intel-microcode),initrd /boot/intel-ucode.img)
+
+define Build/early-microcode
+	if [ "$(CONFIG_PACKAGE_intel-microcode)" = "y" ]; then \
+		test -f "$(EARLY_UCODE_FILE)" || { \
+			echo "缺少 Elkhart Lake 早期微码文件: $(EARLY_UCODE_FILE)" >&2; \
+			exit 1; \
+		}; \
+		rm -rf "$@.ucode"; \
+		$(INSTALL_DIR) "$@.ucode/kernel/x86/microcode"; \
+		$(CP) "$(EARLY_UCODE_FILE)" "$@.ucode/kernel/x86/microcode/GenuineIntel.bin"; \
+		( cd "$@.ucode"; \
+			find . | LC_ALL=C sort | \
+			$(STAGING_DIR_HOST)/bin/cpio --reproducible -o -H newc -R 0:0 \
+		) > "$@.boot/boot/intel-ucode.img"; \
+		$(if $(SOURCE_DATE_EPOCH),touch -hcd "@$(SOURCE_DATE_EPOCH)" "$@.boot/boot/intel-ucode.img";) \
+		rm -rf "$@.ucode"; \
+	fi
+endef
+
 define Build/combined
 	$(CP) $(KDIR)/$(KERNEL_NAME) $@.boot/boot/vmlinuz
 	-$(CP) $(STAGING_DIR_ROOT)/boot/. $@.boot/boot/
@@ -63,6 +84,7 @@ define Build/grub-config
 		-e 's#@CMDLINE@#$(BOOTOPTS) $(GRUB_CONSOLE_CMDLINE)#g' \
 		-e 's#@TIMEOUT@#$(GRUB_TIMEOUT)#g' \
 		-e 's#@TITLE@#$(GRUB_TITLE)#g' \
+		-e 's#@EARLY_INITRD@#$(GRUB_EARLY_INITRD)#g' \
 		./grub-$(1).cfg > $@.boot/boot/grub/grub.cfg
 endef
 
@@ -100,20 +122,20 @@ endef
 
 DEVICE_VARS += GRUB2_VARIANT
 define Device/Default
-  ARTIFACT/image.iso := grub-config iso | iso
-  IMAGE/combined.img := grub-config pc | combined | grub-install | append-metadata
-  IMAGE/combined.img.gz := grub-config pc | combined | grub-install | gzip | append-metadata
-  IMAGE/combined.vdi := grub-config pc | combined | grub-install | qemu-image vdi
-  IMAGE/combined.vmdk := grub-config pc | combined | grub-install | qemu-image vmdk
-  IMAGE/combined.vhdx := grub-config pc | combined | grub-install | qemu-image vhdx -o subformat=dynamic
+  ARTIFACT/image.iso := grub-config iso | early-microcode | iso
+  IMAGE/combined.img := grub-config pc | early-microcode | combined | grub-install | append-metadata
+  IMAGE/combined.img.gz := grub-config pc | early-microcode | combined | grub-install | gzip | append-metadata
+  IMAGE/combined.vdi := grub-config pc | early-microcode | combined | grub-install | qemu-image vdi
+  IMAGE/combined.vmdk := grub-config pc | early-microcode | combined | grub-install | qemu-image vmdk
+  IMAGE/combined.vhdx := grub-config pc | early-microcode | combined | grub-install | qemu-image vhdx -o subformat=dynamic
   IMAGE/rootfs.img := append-rootfs | pad-to $(ROOTFS_PARTSIZE)
   IMAGE/rootfs.img.gz := append-rootfs | pad-to $(ROOTFS_PARTSIZE) | gzip
-  ARTIFACT/image-efi.iso := grub-config iso | iso efi
-  IMAGE/combined-efi.img := grub-config efi | combined efi | grub-install efi | append-metadata
-  IMAGE/combined-efi.img.gz := grub-config efi | combined efi | grub-install efi | gzip | append-metadata
-  IMAGE/combined-efi.vdi := grub-config efi | combined efi | grub-install efi | qemu-image vdi
-  IMAGE/combined-efi.vmdk := grub-config efi | combined efi | grub-install efi | qemu-image vmdk
-  IMAGE/combined-efi.vhdx := grub-config efi | combined efi | grub-install efi | qemu-image vhdx -o subformat=dynamic
+  ARTIFACT/image-efi.iso := grub-config iso | early-microcode | iso efi
+  IMAGE/combined-efi.img := grub-config efi | early-microcode | combined efi | grub-install efi | append-metadata
+  IMAGE/combined-efi.img.gz := grub-config efi | early-microcode | combined efi | grub-install efi | gzip | append-metadata
+  IMAGE/combined-efi.vdi := grub-config efi | early-microcode | combined efi | grub-install efi | qemu-image vdi
+  IMAGE/combined-efi.vmdk := grub-config efi | early-microcode | combined efi | grub-install efi | qemu-image vmdk
+  IMAGE/combined-efi.vhdx := grub-config efi | early-microcode | combined efi | grub-install efi | qemu-image vhdx -o subformat=dynamic
   ifeq ($(CONFIG_TARGET_IMAGES_GZIP),y)
     IMAGES-y := rootfs.img.gz
     IMAGES-$$(CONFIG_GRUB_IMAGES) += combined.img.gz
@@ -150,4 +172,3 @@ endef
 include $(SUBTARGET).mk
 
 $(eval $(call BuildImage))
-

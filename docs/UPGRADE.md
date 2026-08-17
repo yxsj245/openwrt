@@ -7,7 +7,7 @@
 | 平台 | x86/64 Generic |
 | 文件系统 | ext4 |
 | 包管理器 | APK |
-| 虚拟机 | QEMU/KVM, VNC 5900, IP 192.168.122.3 |
+| 虚拟机 | QEMU/KVM, VNC 5900, IP 192.168.123.3 |
 
 ## 三种升级方式对比
 
@@ -61,7 +61,7 @@ Invalid image type
 将镜像通过 SCP 传输到虚拟机的 `/tmp` 目录：
 
 ```bash
-scp /opt/project/openwrt/bin/targets/x86/64/openwrt-x86-64-generic-ext4-combined-efi.img.gz root@192.168.122.3:/tmp/sysupgrade.img.gz
+scp /opt/project/openwrt/bin/targets/x86/64/openwrt-x86-64-generic-ext4-combined-efi.img.gz root@192.168.123.3:/tmp/sysupgrade.img.gz
 ```
 
 > **为什么用 SCP 而不是 HTTP？** 编译机的后台进程（如 `python3 -m http.server`）在 MCP/SSH 会话间不稳定，SCP 传输更加可靠。
@@ -69,7 +69,7 @@ scp /opt/project/openwrt/bin/targets/x86/64/openwrt-x86-64-generic-ext4-combined
 ### 第三步：执行升级
 
 ```bash
-ssh root@192.168.122.3 "sysupgrade -v -F /tmp/sysupgrade.img.gz"
+ssh root@192.168.123.3 "sysupgrade -v -F /tmp/sysupgrade.img.gz"
 ```
 
 > **Docker 持久化分区注意事项：** 不要添加 `-p` 参数。x86 平台默认保留现有分区表，额外的 `docker_data` 分区不会被普通 sysupgrade 写入；`-p` 会关闭该保留逻辑。完整配置与验证方法见 [docker-persistence.md](docker-persistence.md)。
@@ -109,28 +109,28 @@ echo "Qw133133" | su -c "qemu-system-x86_64 \
 ```bash
 # 等待系统启动
 for i in $(seq 1 15); do
-  ssh -o ConnectTimeout=3 root@192.168.122.3 "echo OK" 2>/dev/null && break
+  ssh -o ConnectTimeout=3 root@192.168.123.3 "echo OK" 2>/dev/null && break
   sleep 3
 done
 
 # 检查版本
-ssh root@192.168.122.3 "cat /etc/openwrt_release | head -3"
+ssh root@192.168.123.3 "cat /etc/openwrt_release | head -3"
 
 # 检查 LuCI 包
-ssh root@192.168.122.3 "apk list --installed | grep -cE 'luci|uhttpd'"
+ssh root@192.168.123.3 "apk list --installed | grep -cE 'luci|uhttpd'"
 
 # 检查 uhttpd 服务
-ssh root@192.168.122.3 "/etc/init.d/uhttpd status"
+ssh root@192.168.123.3 "/etc/init.d/uhttpd status"
 
 # 检查 Web 端口
-ssh root@192.168.122.3 "netstat -tlnp | grep ':80'"
+ssh root@192.168.123.3 "netstat -tlnp | grep ':80'"
 
 # 检查 Docker 持久化分区（已配置时）
-ssh root@192.168.122.3 "mount | grep ' on /opt/docker '"
-ssh root@192.168.122.3 "docker ps -a"
+ssh root@192.168.123.3 "mount | grep ' on /opt/docker '"
+ssh root@192.168.123.3 "docker ps -a"
 
 # 访问 Web 界面
-curl -s http://192.168.122.3/ | head -5
+curl -s http://192.168.123.3/ | head -5
 ```
 
 ---
@@ -173,5 +173,5 @@ kill -9 <PID>
 
 **解决**：使用 `-c` 参数保留所有 `/etc/` 修改：
 ```bash
-ssh root@192.168.122.3 "sysupgrade -c -F /tmp/sysupgrade.img.gz"
+ssh root@192.168.123.3 "sysupgrade -c -F /tmp/sysupgrade.img.gz"
 ```

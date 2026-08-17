@@ -1,11 +1,22 @@
 #!/bin/sh /etc/rc.common
 
 START=98
+STOP=10
 
-USE_PROCD=1
+EXTRA_COMMANDS="apply"
+EXTRA_HELP="\tapply\t重新应用 i226-V 网卡调优"
 
 I226V_VENDOR="0x8086"
 I226V_DEVICE="0x125c"
+APPLY_ERRORS=0
+
+log_info() {
+	logger -t nic-tuning "$*"
+}
+
+log_error() {
+	logger -p daemon.err -t nic-tuning "$*"
+}
 
 is_i226v() {
 	local iface="$1"
@@ -19,47 +30,175 @@ is_i226v() {
 }
 
 scan_i226v_interfaces() {
-	for d in /sys/class/net/eth*; do
-		[ -d "$d" ] || continue
-		local name=$(basename "$d")
-		if is_i226v "$name"; then
-			echo "$name"
-		fi
+	local path iface
+
+	for path in /sys/class/net/*; do
+		[ -d "$path" ] || continue
+		iface=${path##*/}
+		is_i226v "$iface" && echo "$iface"
 	done
 }
 
-has_i226v() {
-	scan_i226v_interfaces | grep -q .
-}
-
-apply_ethtool_tuning() {
+run_ethtool() {
 	local iface="$1"
-	logger -t nic-tuning "Applying i226-V gaming optimizations for ${iface}"
+	local operation="$2"
+	local output
+	shift 2
 
-	ethtool -L "$iface" combined 4 2>/dev/null
-
-	ethtool -C "$iface" adaptive-rx off adaptive-tx off 2>/dev/null
-	ethtool -C "$iface" rx-usecs 8 tx-usecs 8 2>/dev/null
-
-	ethtool -G "$iface" rx 256 tx 256 2>/dev/null
-
-	ethtool -K "$iface" tso off gso off gro off 2>/dev/null
-}
-
-boot() {
-	if ! has_i226v; then
+	if output=$("$@" 2>&1); then
 		return 0
 	fi
 
-	for iface in $(scan_i226v_interfaces); do
-		apply_ethtool_tuning "$iface"
-	done
-
-	logger -t nic-tuning "i226-V gaming NIC tuning completed"
+	APPLY_ERRORS=$((APPLY_ERRORS + 1))
+	log_error "${iface} ${operation}失败: ${output}"
+	return 1
 }
 
-start_service() {
-	procd_open_instance
-	procd_set_param command /bin/busybox sleep 365d
-	procd_close_instance
+load_settings() {
+	local queue_override ring_override
+
+	config_load nic-tuning
+	config_get_bool tuning_enabled settings enabled 1
+	config_get profile settings profile balanced
+	config_get irq_mode settings irq_mode irqbalance
+	config_get queue_override settings queue_count ""
+	config_get ring_override settings ring_size ""
+
+	case "$profile" in
+		balanced)
+			ring_size=1024
+			adaptive=""
+			rx_usecs=""
+			tx_usecs=""
+			offload=on
+			;;
+		low-latency)
+			ring_size=512
+			adaptive=off
+			rx_usecs=8
+			tx_usecs=8
+			offload=off
+			;;
+		throughput)
+			ring_size=4096
+			adaptive=on
+			rx_usecs=""
+			tx_usecs=""
+			offload=on
+			;;
+		*)
+			log_error "不支持的调优模式: ${profile}"
+			return 1
+			;;
+	esac
+
+	[ -n "$queue_override" ] && queue_count="$queue_override" || queue_count=auto
+	[ -n "$ring_override" ] && ring_size="$ring_override"
+	return 0
+}
+
+get_channel_value() {
+	local iface="$1"
+	local section="$2"
+
+	ethtool -l "$iface" 2>/dev/null | awk -v wanted="$section" '
+		$0 ~ wanted { found=1; next }
+		found && $1 == "Combined:" { print $2; exit }
+	'
+}
+
+resolve_queue_count() {
+	local iface="$1"
+	local max_combined total_cpus wanted
+
+	max_combined=$(get_channel_value "$iface" "Pre-set maximums:")
+	[ -n "$max_combined" ] || return 1
+
+	if [ "$queue_count" = "auto" ]; then
+		total_cpus=$(nproc 2>/dev/null || echo 1)
+		wanted="$total_cpus"
+	else
+		wanted="$queue_count"
+	fi
+
+	case "$wanted" in
+		''|*[!0-9]*|0) return 1 ;;
+	esac
+
+	[ "$wanted" -gt "$max_combined" ] && wanted="$max_combined"
+	echo "$wanted"
+}
+
+apply_interface() {
+	local iface="$1"
+	local wanted_queues
+
+	wanted_queues=$(resolve_queue_count "$iface")
+	if [ -n "$wanted_queues" ]; then
+		run_ethtool "$iface" "设置队列" ethtool -L "$iface" combined "$wanted_queues"
+	else
+		APPLY_ERRORS=$((APPLY_ERRORS + 1))
+		log_error "${iface} 无法确定有效的 combined 队列数"
+	fi
+
+	run_ethtool "$iface" "设置 Ring Buffer" ethtool -G "$iface" rx "$ring_size" tx "$ring_size"
+
+	if [ -n "$adaptive" ]; then
+		run_ethtool "$iface" "设置自适应中断合并" \
+			ethtool -C "$iface" adaptive-rx "$adaptive" adaptive-tx "$adaptive"
+	fi
+
+	if [ -n "$rx_usecs" ] && [ -n "$tx_usecs" ]; then
+		run_ethtool "$iface" "设置中断合并延迟" \
+			ethtool -C "$iface" rx-usecs "$rx_usecs" tx-usecs "$tx_usecs"
+	fi
+
+	run_ethtool "$iface" "设置硬件分载" \
+		ethtool -K "$iface" tso "$offload" gso "$offload" gro "$offload"
+
+	log_info "${iface} 已应用 ${profile} 模式"
+}
+
+apply_all() {
+	local iface iface_count=0
+
+	APPLY_ERRORS=0
+	load_settings || return 1
+	[ "$tuning_enabled" -eq 1 ] || {
+		log_info "网卡调优已禁用"
+		return 0
+	}
+
+	for iface in $(scan_i226v_interfaces); do
+		iface_count=$((iface_count + 1))
+		apply_interface "$iface"
+	done
+
+	if [ "$iface_count" -eq 0 ]; then
+		log_info "未检测到 Intel i226-V 网卡"
+		return 0
+	fi
+
+	if [ "$APPLY_ERRORS" -gt 0 ]; then
+		log_error "i226-V 网卡调优完成，但有 ${APPLY_ERRORS} 项设置失败"
+		return 1
+	fi
+
+	log_info "i226-V 网卡调优完成，共处理 ${iface_count} 个端口"
+}
+
+boot() {
+	apply_all
+}
+
+start() {
+	apply_all
+}
+
+reload() {
+	apply_all
+}
+
+apply() {
+	apply_all
 }
