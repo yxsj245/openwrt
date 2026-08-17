@@ -67,7 +67,14 @@ rm -f \
 	/etc/init.d/sqm \
 	/usr/share/luci/menu.d/luci-app-clientlimit.json \
 	/usr/share/rpcd/acl.d/luci-app-clientlimit.json \
-	/www/luci-static/resources/view/services/clientlimit.js
+	/www/luci-static/resources/view/services/clientlimit.js \
+	/usr/share/luci/menu.d/luci-app-sqm.json \
+	/usr/share/rpcd/acl.d/luci-app-sqm.json \
+	/www/luci-static/resources/view/network/sqm.js
+
+rm -f /tmp/luci-indexcache.*
+rm -rf /tmp/luci-modulecache
+/etc/init.d/rpcd reload 2>/dev/null
 
 /etc/init.d/qosmate enable
 exit 0

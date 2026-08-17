@@ -2,7 +2,7 @@ config global 'global'
 	option enabled '1'
 
 config settings 'settings'
-	option WAN 'eth1'
+	option WAN 'auto'
 	option DOWNRATE '85000'
 	option UPRATE '10000'
 	option ROOT_QDISC 'cake'

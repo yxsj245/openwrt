@@ -6,7 +6,7 @@ STOP=99
 
 USE_PROCD=1
 
-VERSION="v1.9.0"
+VERSION="1.9.0"
 UPD_CHANNEL="release"
 
 EXTRA_COMMANDS="check_version update auto_setup auto_setup_noninteractive validate_custom_rules health_check"
@@ -261,6 +261,60 @@ check_files_integrity() {
 
     md5sum -c "$reg_file" &>/dev/null || return 4
     :
+}
+
+# 组件文件完整时同步本机校验记录，避免固件升级后触发联网修复
+ensure_files_registry() {
+    local component="$1" reg_file files file
+
+    eval "reg_file=\"\${QOSMATE_FILES_REG_PATH_${component}}\""
+    [ -f "$reg_file" ] && md5sum -c "$reg_file" >/dev/null 2>&1 && return 0
+
+    files="$(print_file_list "$component" ALL)" || return 1
+    [ -n "$files" ] || return 1
+
+    local IFS="$_NL_"
+    for file in $files; do
+        [ -f "$file" ] || return 1
+    done
+
+    try_mkdir -p "${reg_file%/*}" || return 1
+    md5sum $files > "$reg_file"
+}
+
+# 配置设备缺失时依次使用逻辑 WAN、UCI WAN 和默认路由设备
+resolve_wan_interface() {
+    local configured_wan="$WAN" candidate
+
+    [ -n "$configured_wan" ] && [ -e "/sys/class/net/${configured_wan}" ] && return 0
+
+    candidate="$(ubus call network.interface.wan status 2>/dev/null | jsonfilter -e '@.l3_device' 2>/dev/null)"
+    [ -n "$candidate" ] && [ -e "/sys/class/net/${candidate}" ] || candidate=''
+
+    if [ -z "$candidate" ]; then
+        candidate="$(uci -q get network.wan.device)"
+        [ -n "$candidate" ] && [ -e "/sys/class/net/${candidate}" ] || candidate=''
+    fi
+
+    if [ -z "$candidate" ]; then
+        candidate="$(ip -4 route show default 2>/dev/null | awk 'NR == 1 { for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')"
+        [ -n "$candidate" ] && [ -e "/sys/class/net/${candidate}" ] || candidate=''
+    fi
+
+    if [ -z "$candidate" ]; then
+        candidate="$(ip -6 route show default 2>/dev/null | awk 'NR == 1 { for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i + 1); exit } }')"
+        [ -n "$candidate" ] && [ -e "/sys/class/net/${candidate}" ] || candidate=''
+    fi
+
+    [ -n "$candidate" ] || {
+        error_out "未找到可用的 WAN 设备，请在 QoSmate 设置中指定实际网络设备。"
+        return 1
+    }
+
+    log_msg -warn "配置的 WAN 设备 '${configured_wan}' 不存在，自动使用 '${candidate}'。"
+    WAN="$candidate"
+    export WAN
+    uci set "qosmate.settings.WAN=${WAN}" && uci commit qosmate
 }
 
 # 1 - component: BACKEND|FRONTEND
@@ -1887,6 +1941,7 @@ start_service() {
 
     # Check files and re-fetch them if any are missing
     for component in $QOSMATE_COMPONENTS; do
+        ensure_files_registry "$component" || :
         check_files_integrity "$component"
         rv=$?
         case $rv in
@@ -1921,6 +1976,7 @@ start_service() {
     create_hotplug_script
 
     load_and_fix_config || return 1
+    resolve_wan_interface || return 1
 
     # Enable the global option
     uci set qosmate.global.enabled='1'

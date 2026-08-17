@@ -19,7 +19,7 @@ QoSmate 不加入项目的 LuCI 统一服务管理页，使用其自带页面管
 
 | 配置项 | 默认值 |
 |--------|--------|
-| WAN 设备 | `eth1` |
+| WAN 设备 | `auto`，启动时解析逻辑 WAN 或默认路由设备 |
 | 下载带宽 | `85000` Kbit/s |
 | 上传带宽 | `10000` Kbit/s |
 | 根队列 | `cake` |
@@ -71,8 +71,9 @@ QoSmate 与 SQM 都会控制 WAN 的 tc 队列，不能同时运行。当前固�
 uci show qosmate
 
 # CAKE/IFB 队列
-tc -s qdisc show dev eth1
-tc -s qdisc show dev ifb-eth1
+WAN="$(uci -q get qosmate.settings.WAN)"
+tc -s qdisc show dev "$WAN"
+tc -s qdisc show dev "ifb-$WAN"
 
 # QoSmate nftables 表和限速规则
 nft list table inet dscptag
@@ -82,7 +83,7 @@ apk list --installed | grep -E 'clientlimit|sqm' || true
 nft list tables | grep clientlimit || true
 ```
 
-如果 WAN 设备不是 `eth1`，将验证命令中的设备名替换为 **Settings** 页面配置的实际设备。
+QoSmate 会在配置设备缺失时依次探测逻辑 WAN、`network.wan.device` 和默认路由设备，并将最终设备写回配置。
 
 ## 7. 配置备份与恢复
 
