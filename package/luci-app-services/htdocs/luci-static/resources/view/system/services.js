@@ -24,6 +24,12 @@ var callUbusServiceList = rpc.declare({
 
 var SERVICE_DEFINITIONS = [
 	{
+		id: 'smartdns-openclash-compat',
+		name: 'SmartDNS 与 OpenClash 兼容服务',
+		desc: 'OpenClash 启用时自动协调 DNS 转发链路，停止服务后恢复原始配置',
+		management_link: null
+	},
+	{
 		id: 'dockerd',
 		name: 'Docker',
 		desc: 'Docker容器引擎，用于运行和管理容器化应用',
@@ -224,7 +230,7 @@ return view.extend({
 		mainContainer.appendChild(E('div', { 'class': 'cbi-map-descr' }, [
 			_('在此页面可以管理系统中的各项服务。您可以启动、停止服务，以及设置服务是否开机自启。'),
 			E('br'),
-			E('em', { style: 'color: #e67e22;' }, _('注意：默认情况下所有服务均为关闭状态，需要手动启用。'))
+			E('em', { style: 'color: #e67e22;' }, _('注意：各服务的默认启用状态由固件功能需求决定。'))
 		]));
 
 		var servicesContainer = E('div', {
@@ -244,7 +250,7 @@ return view.extend({
 		}, [
 			E('strong', {}, _('提示：')),
 			' ',
-			_('启用"开机自启"后，服务会在系统启动时自动运行。启用 Docker 后，您可以通过 Docker 管理页面进行容器、镜像等详细管理。')
+			_('启用"开机自启"后，服务会在系统启动时自动运行。停止兼容服务会恢复其接管前的 DNS 配置。')
 		]);
 
 		mainContainer.appendChild(footerNote);

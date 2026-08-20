@@ -1,0 +1,28 @@
+#!/bin/sh /etc/rc.common
+
+USE_PROCD=1
+START=98
+STOP=14
+
+start_service() {
+	rm -f /var/run/smartdns-openclash-compat.stopping
+	procd_open_instance
+	procd_set_param command /usr/sbin/smartdns-openclash-compat run
+	procd_set_param respawn 3600 5 5
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+stop_service() {
+	local restart_services="1"
+	mkdir -p /var/run
+	: > /var/run/smartdns-openclash-compat.stopping
+	[ "$SMARTDNS_OPENCLASH_SHUTDOWN" = "1" ] && restart_services="0"
+	/usr/sbin/smartdns-openclash-compat restore "$restart_services"
+}
+
+# 关机阶段只恢复持久化配置，避免重新拉起正在关闭的网络服务。
+shutdown() {
+	SMARTDNS_OPENCLASH_SHUTDOWN="1" stop
+}

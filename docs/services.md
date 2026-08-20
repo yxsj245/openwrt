@@ -136,9 +136,15 @@ var SERVICE_DEFINITIONS = [
 
 ---
 
+## 首次安装启用规则
+
+通常由用户按需启动的服务，首次安装后应处于停止状态。固件基础功能依赖的协调服务可以默认启用，但必须在服务说明中明确其自动行为和停止后的恢复行为。
+
+`smartdns-openclash-compat` 属于默认启用的协调服务：只有 OpenClash 与 SmartDNS 同时启用时才会接管 DNS 配置，用户停止该服务后会恢复接管前的配置。
+
 ## 首次安装禁用规则
 
-**核心原则：** 所有通过此页面管理的服务，首次安装后必须处于停止状态（`running: false` + `enabled: false`）。
+**核心原则：** 非固件基础功能所必需的服务，首次安装后应处于停止状态（`running: false` + `enabled: false`）。
 
 如果某个服务的安装包（如 dockerd）自带开机自启链接（`/etc/rc.d/S*`），必须在 `root/etc/uci-defaults/99-disable-services` 中先 stop 再 disable。该脚本由 OpenWrt 在首次启动时自动执行一次后删除。
 
