@@ -104,3 +104,16 @@ ruby -ryaml -e 'v=YAML.load_file(ARGV[0]); puts(v.dig("rule-providers", "banip-a
 /etc/init.d/banip-authority stop
 /etc/init.d/banip-authority disable
 ```
+
+## 主路由测试
+
+`tests/banip-main-router/` 提供双网口主路由测试脚本。测试环境必须先确认 LAN 到 WAN 的未封禁基线可达，再执行：
+
+```sh
+/tmp/banip-blocklist-test.sh apply
+/tmp/banip-blocklist-test.sh restore
+```
+
+脚本会等待 banIP 完成异步 reload，测试 `203.0.113.55` 和 `example.org` 的封禁与恢复。不要在状态仍为 `processing` 时判断封禁结果。
+
+banIP 与 QoSmate 可以同时运行，但 QoSmate 的 WAN 必须指向真实上联或使用 `auto`。如果误把 `br-lan` 配成 WAN，QoSmate 的 ingress `ctinfo` 会让普通 LAN 转发被 fw4 判为 `ct state invalid`；这种情况下，即使停止 banIP，转发仍然失败，属于 QoSmate 拓扑配置问题。

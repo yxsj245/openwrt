@@ -7,7 +7,7 @@
 var callServiceList = rpc.declare({
 	object: 'rc',
 	method: 'list',
-	params: ['name']
+	params: ['name', 'skip_running_check']
 });
 
 var callServiceAction = rpc.declare({
@@ -44,7 +44,7 @@ var SERVICE_DEFINITIONS = [
 ];
 
 function getServiceStatus(service) {
-	return callServiceList(service.id).then(function(data) {
+	return callServiceList(service.id, true).then(function(data) {
 		var svc = data[service.id];
 		if (!svc) {
 			return { running: false, enabled: false };

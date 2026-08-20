@@ -112,6 +112,14 @@ end
 
 rules = Set.new
 objects.each do |entry|
+  set = entry['set']
+  if set && blocked_sets.include?(set['name']) && !set['type'].to_s.include?('.')
+    element_values(set['elem']).each do |value|
+      rule = clash_ip_rule(value)
+      rules << rule if rule
+    end
+  end
+
   element = entry['element']
   next unless element && blocked_sets.include?(element['name'])
   next if set_types[element['name']].include?('.')

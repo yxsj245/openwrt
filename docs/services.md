@@ -26,13 +26,13 @@ package/luci-app-services/
 
 ### 状态检测
 
-使用 `rc.list` ubus 方法查询 procd 服务注册表，返回 `{ running: bool, enabled: bool }`：
+使用 `rc.list` 的 `skip_running_check=true` 查询服务注册表和开机自启状态，再使用 `service.list` 查询 procd 实例运行状态。这样服务停止后仍能保留正确的 `enabled`，也兼容 `rc.list` 不返回 `running` 的 jail 服务：
 
 ```javascript
 var callServiceList = rpc.declare({
     object: 'rc',
     method: 'list',
-    params: ['name']
+    params: ['name', 'skip_running_check']
 });
 ```
 
@@ -41,8 +41,21 @@ ubus 返回示例：
 {
     "dockerd": {
         "start": 99,
-        "enabled": false,
-        "running": true
+        "enabled": false
+    }
+}
+```
+
+`service.list` 返回示例：
+
+```json
+{
+    "dockerd": {
+        "instances": {
+            "instance1": {
+                "running": true
+            }
+        }
     }
 }
 ```
