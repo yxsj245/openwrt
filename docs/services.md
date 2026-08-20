@@ -26,13 +26,13 @@ package/luci-app-services/
 
 ### 状态检测
 
-使用 `rc.list` ubus 方法查询 procd 服务注册表，返回 `{ running: bool, enabled: bool }`：
+使用 `rc.list` 的 `skip_running_check=true` 查询服务注册表和开机自启状态，再使用 `service.list` 查询 procd 实例运行状态。这样服务停止后仍能保留正确的 `enabled`，也兼容 `rc.list` 不返回 `running` 的 jail 服务：
 
 ```javascript
 var callServiceList = rpc.declare({
     object: 'rc',
     method: 'list',
-    params: ['name']
+    params: ['name', 'skip_running_check']
 });
 ```
 
@@ -41,8 +41,21 @@ ubus 返回示例：
 {
     "dockerd": {
         "start": 99,
-        "enabled": false,
-        "running": true
+        "enabled": false
+    }
+}
+```
+
+`service.list` 返回示例：
+
+```json
+{
+    "dockerd": {
+        "instances": {
+            "instance1": {
+                "running": true
+            }
+        }
     }
 }
 ```
@@ -136,9 +149,17 @@ var SERVICE_DEFINITIONS = [
 
 ---
 
+## 首次安装启用规则
+
+通常由用户按需启动的服务，首次安装后应处于停止状态。固件基础功能依赖的协调服务可以默认启用，但必须在服务说明中明确其自动行为和停止后的恢复行为。
+
+`smartdns-openclash-compat` 属于默认启用的协调服务：只有 OpenClash 与 SmartDNS 同时启用时才会接管 DNS 配置，用户停止该服务后会恢复接管前的配置。
+
+`banip-authority` 也属于默认启用的协调服务。它只在 banIP 启用且 nftables 表已生成时安装强制封禁链，并将 banIP 出站集合转换为 OpenClash 的最高优先级规则提供者。停止服务后会删除托管链、规则提供者和覆写钩子，同时恢复原来的 banIP 域名解析器配置。
+
 ## 首次安装禁用规则
 
-**核心原则：** 所有通过此页面管理的服务，首次安装后必须处于停止状态（`running: false` + `enabled: false`）。
+**核心原则：** 非固件基础功能所必需的服务，首次安装后应处于停止状态（`running: false` + `enabled: false`）。
 
 如果某个服务的安装包（如 dockerd）自带开机自启链接（`/etc/rc.d/S*`），必须在 `root/etc/uci-defaults/99-disable-services` 中先 stop 再 disable。该脚本由 OpenWrt 在首次启动时自动执行一次后删除。
 

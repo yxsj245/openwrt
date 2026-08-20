@@ -1,0 +1,4 @@
+<network>
+  <name>net-banip-lan</name>
+  <bridge name="virbr-banip" stp="on" delay="0"/>
+</network>
