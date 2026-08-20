@@ -24,6 +24,12 @@ var callUbusServiceList = rpc.declare({
 
 var SERVICE_DEFINITIONS = [
 	{
+		id: 'banip-authority',
+		name: 'banIP 强制封禁协调服务',
+		desc: '让 banIP 优先于透明代理和路由策略，并同步 OpenClash 内部封禁规则',
+		management_link: 'admin/services/banip'
+	},
+	{
 		id: 'smartdns-openclash-compat',
 		name: 'SmartDNS 与 OpenClash 兼容服务',
 		desc: 'OpenClash 启用时自动协调 DNS 转发链路，停止服务后恢复原始配置',
@@ -250,7 +256,7 @@ return view.extend({
 		}, [
 			E('strong', {}, _('提示：')),
 			' ',
-			_('启用"开机自启"后，服务会在系统启动时自动运行。停止兼容服务会恢复其接管前的 DNS 配置。')
+			_('启用"开机自启"后，服务会在系统启动时自动运行。停止协调服务会移除其托管规则并恢复接管前的配置。')
 		]);
 
 		mainContainer.appendChild(footerNote);

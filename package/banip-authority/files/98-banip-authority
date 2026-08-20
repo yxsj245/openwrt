@@ -1,0 +1,24 @@
+#!/bin/sh
+
+if [ "$(uci -q get banip_authority.state.initialized)" != "1" ]; then
+	uci -q set banip.global.ban_enabled='1'
+	uci -q set banip.global.ban_trigger='wan'
+	uci -q set banip.global.ban_autoallowlist='1'
+	uci -q set banip.global.ban_autoallowuplink='subnet'
+	uci -q set banip.global.ban_allowlistonly='0'
+	uci -q delete banip.global.ban_feed
+	uci -q delete banip.global.ban_feedin
+	uci -q delete banip.global.ban_feedout
+	uci -q delete banip.global.ban_feedinout
+	for feed in cinsscore debl turris doh; do
+		uci -q add_list banip.global.ban_feed="$feed"
+		uci -q add_list banip.global.ban_feedinout="$feed"
+	done
+	uci -q set banip_authority.state.initialized='1'
+	uci -q commit banip
+	uci -q commit banip_authority
+fi
+
+/etc/init.d/banip enable 2>/dev/null
+/etc/init.d/banip-authority enable 2>/dev/null
+exit 0

@@ -142,6 +142,8 @@ var SERVICE_DEFINITIONS = [
 
 `smartdns-openclash-compat` 属于默认启用的协调服务：只有 OpenClash 与 SmartDNS 同时启用时才会接管 DNS 配置，用户停止该服务后会恢复接管前的配置。
 
+`banip-authority` 也属于默认启用的协调服务。它只在 banIP 启用且 nftables 表已生成时安装强制封禁链，并将 banIP 出站集合转换为 OpenClash 的最高优先级规则提供者。停止服务后会删除托管链、规则提供者和覆写钩子，同时恢复原来的 banIP 域名解析器配置。
+
 ## 首次安装禁用规则
 
 **核心原则：** 非固件基础功能所必需的服务，首次安装后应处于停止状态（`running: false` + `enabled: false`）。
