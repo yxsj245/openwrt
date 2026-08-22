@@ -11,7 +11,7 @@
 
 SmartDNS 的 `auto_set_dnsmasq` 默认开启。服务启动时会把 dnsmasq 的上游设置为 `127.0.0.1#6053`，并启用 dnsmasq 的 `noresolv`，避免 dnsmasq 绕过 SmartDNS 直接查询 WAN DNS。
 
-固件同时预装 OpenClash 时，由 `smartdns-openclash-compat` 服务自动协调两者。OpenClash 启用期间，链路调整为 `客户端 -> dnsmasq:53 -> OpenClash -> SmartDNS`；兼容服务会临时关闭 SmartDNS 对 dnsmasq 的自动接管，并动态读取实际监听端口，不写死为 6053。停止兼容服务或禁用 OpenClash 后会恢复接管前的配置。详细行为参见 [SmartDNS 与 OpenClash 兼容服务](smartdns-openclash-compat.md)。
+固件同时预装 OpenClash 时，由 `smartdns-openclash-compat` 服务自动协调两者。OpenClash 启用期间，链路调整为 `客户端 -> dnsmasq:53 -> OpenClash -> SmartDNS`；兼容服务会临时关闭 SmartDNS 对 dnsmasq 的自动接管，并动态读取实际监听端口，不写死为 6053。服务首次运行会把 OpenClash 默认设置为 `redir-host` 并启用域名嗅探，避免浏览器把 Fake-IP 识别为本地地址；还会检测首轮启动时透明代理防火墙链缺失的问题。停止兼容服务或禁用 OpenClash 后会恢复接管前的 DNS 配置，但保留用户当前选择的 OpenClash 运行模式。详细行为参见 [SmartDNS 与 OpenClash 兼容服务](smartdns-openclash-compat.md)。
 
 ## LuCI 管理
 
