@@ -1,8 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=smartdns-openclash-compat
-PKG_VERSION:=1.0.0
-PKG_RELEASE:=1
+PKG_VERSION:=1.1.0
+PKG_RELEASE:=2
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=OpenWrt Developer
 
@@ -36,6 +36,20 @@ define Package/smartdns-openclash-compat/install
 	$(INSTALL_BIN) ./files/smartdns-openclash-compat.sh $(1)/usr/sbin/smartdns-openclash-compat
 	$(INSTALL_DIR) $(1)/usr/libexec
 	$(INSTALL_BIN) ./files/smartdns-openclash-compat-overwrite.sh $(1)/usr/libexec/smartdns-openclash-compat-overwrite
+endef
+
+define Package/smartdns-openclash-compat/postinst
+#!/bin/sh
+[ -n "$${IPKG_INSTROOT}" ] && exit 0
+for file in \
+	/etc/config/smartdns_openclash_compat \
+	/etc/init.d/smartdns-openclash-compat \
+	/usr/sbin/smartdns-openclash-compat \
+	/usr/libexec/smartdns-openclash-compat-overwrite; do
+	[ -e "$$file" ] || continue
+	chown 0:0 "$$file" || exit 1
+done
+exit 0
 endef
 
 $(eval $(call BuildPackage,smartdns-openclash-compat))

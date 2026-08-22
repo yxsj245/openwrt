@@ -11,13 +11,57 @@ HOOK_END="# END SMARTDNS-OPENCLASH-COMPAT"
 HOOK_COMMAND='[ -x /usr/libexec/smartdns-openclash-compat-overwrite ] && /usr/libexec/smartdns-openclash-compat-overwrite "${CONFIG_FILE:-$1}"'
 LOCK_DIR="/var/lock/$SERVICE.lock"
 STOP_FILE="/var/run/$SERVICE.stopping"
-INTERVAL="5"
+FIREWALL_MISSING_FILE="/var/run/$SERVICE.firewall-missing"
+FIREWALL_REPAIR_FILE="/var/run/$SERVICE.firewall-repair"
 OPENCLASH_CHANGED="0"
+REAL_IP_DEFAULT_CHANGED="0"
 SMARTDNS_SECTION=""
 LOCK_HELD="0"
 
 log_info() {
 	logger -t "$SERVICE" "$*"
+}
+
+get_positive_setting() {
+	local option="$1"
+	local default_value="$2"
+	local value
+
+	value="$(uci -q get "$STATE_CONFIG.settings.$option")"
+	case "$value" in
+		''|*[!0-9]*) value="$default_value" ;;
+	esac
+	[ "$value" -gt 0 ] 2>/dev/null || value="$default_value"
+	printf '%s\n' "$value"
+}
+
+setting_enabled() {
+	[ "$(uci -q get "$STATE_CONFIG.settings.$1")" != "0" ]
+}
+
+ensure_setting_default() {
+	local option="$1"
+	local value="$2"
+
+	uci -q get "$STATE_CONFIG.settings.$option" >/dev/null 2>&1 && return 0
+	uci -q set "$STATE_CONFIG.settings.$option=$value"
+	SETTINGS_CHANGED="1"
+}
+
+ensure_settings_config() {
+	local SETTINGS_CHANGED="0"
+
+	uci -q get "$STATE_CONFIG.settings" >/dev/null 2>&1 || {
+		uci -q set "$STATE_CONFIG.settings=settings"
+		SETTINGS_CHANGED="1"
+	}
+	ensure_setting_default apply_real_ip_default 1
+	ensure_setting_default real_ip_default_applied 0
+	ensure_setting_default repair_firewall 1
+	ensure_setting_default check_interval 5
+	ensure_setting_default firewall_missing_checks 6
+	ensure_setting_default firewall_repair_cooldown 300
+	[ "$SETTINGS_CHANGED" = "1" ] && uci -q commit "$STATE_CONFIG"
 }
 
 acquire_lock() {
@@ -240,6 +284,29 @@ set_if_changed() {
 	OPENCLASH_CHANGED="1"
 }
 
+apply_real_ip_default() {
+	REAL_IP_DEFAULT_CHANGED="0"
+	setting_enabled apply_real_ip_default || return 0
+	[ "$(uci -q get "$STATE_CONFIG.settings.real_ip_default_applied")" = "1" ] && return 0
+
+	[ "$(uci -q get openclash.config.en_mode)" = "redir-host" ] || {
+		uci -q set openclash.config.en_mode=redir-host
+		REAL_IP_DEFAULT_CHANGED="1"
+	}
+	[ "$(uci -q get openclash.config.operation_mode)" = "redir-host" ] || {
+		uci -q set openclash.config.operation_mode=redir-host
+		REAL_IP_DEFAULT_CHANGED="1"
+	}
+	[ "$(uci -q get openclash.config.enable_meta_sniffer)" = "1" ] || {
+		uci -q set openclash.config.enable_meta_sniffer=1
+		REAL_IP_DEFAULT_CHANGED="1"
+	}
+	uci -q set "$STATE_CONFIG.settings.real_ip_default_applied=1"
+	uci -q commit openclash
+	uci -q commit "$STATE_CONFIG"
+	log_info "已应用 OpenClash Real-IP 首次默认配置：redir-host 与域名嗅探"
+}
+
 ensure_settings() {
 	local smartdns_port
 
@@ -278,6 +345,75 @@ ensure_settings() {
 	return 0
 }
 
+reset_firewall_check() {
+	rm -f "$FIREWALL_MISSING_FILE"
+}
+
+openclash_firewall_ready() {
+	if command -v nft >/dev/null 2>&1 && nft list table inet fw4 >/dev/null 2>&1; then
+		nft list chain inet fw4 openclash >/dev/null 2>&1
+		return "$?"
+	fi
+
+	if command -v iptables >/dev/null 2>&1; then
+		iptables -t nat -nL openclash >/dev/null 2>&1 || \
+			iptables -t mangle -nL openclash >/dev/null 2>&1
+		return "$?"
+	fi
+
+	return 1
+}
+
+repair_openclash_firewall() {
+	local missing_count missing_limit cooldown now last_repair
+
+	setting_enabled repair_firewall || {
+		reset_firewall_check
+		return 0
+	}
+	[ "$(uci -q get openclash.config.en_mode)" = "redir-host" ] || {
+		reset_firewall_check
+		return 0
+	}
+	pidof clash >/dev/null 2>&1 || {
+		reset_firewall_check
+		return 0
+	}
+	/etc/init.d/openclash running >/dev/null 2>&1 || return 0
+
+	if openclash_firewall_ready; then
+		reset_firewall_check
+		return 0
+	fi
+
+	missing_count="$(cat "$FIREWALL_MISSING_FILE" 2>/dev/null)"
+	case "$missing_count" in
+		''|*[!0-9]*) missing_count="0" ;;
+	esac
+	missing_count=$((missing_count + 1))
+	printf '%s\n' "$missing_count" > "$FIREWALL_MISSING_FILE"
+
+	missing_limit="$(get_positive_setting firewall_missing_checks 6)"
+	[ "$missing_count" -ge "$missing_limit" ] || return 0
+
+	cooldown="$(get_positive_setting firewall_repair_cooldown 300)"
+	now="$(date +%s)"
+	last_repair="$(cat "$FIREWALL_REPAIR_FILE" 2>/dev/null)"
+	case "$last_repair" in
+		''|*[!0-9]*) last_repair="0" ;;
+	esac
+	[ $((now - last_repair)) -ge "$cooldown" ] || return 0
+
+	printf '%s\n' "$now" > "$FIREWALL_REPAIR_FILE"
+	reset_firewall_check
+	log_info "检测到 OpenClash 核心运行但透明代理链持续缺失，开始同步重建防火墙"
+	if /etc/init.d/openclash reload restore >/dev/null 2>&1 && openclash_firewall_ready; then
+		log_info "OpenClash 防火墙同步重建成功"
+	else
+		log_info "OpenClash 防火墙同步重建未完成，将在冷却期后再次检查"
+	fi
+}
+
 remove_managed_dns_cb() {
 	local section="$1"
 	local managed
@@ -309,6 +445,8 @@ restore_locked() {
 
 	[ "$(uci -q get "$STATE_SECTION.active")" = "1" ] || {
 		remove_hook
+		reset_firewall_check
+		rm -f "$FIREWALL_REPAIR_FILE"
 		return 0
 	}
 
@@ -334,6 +472,8 @@ restore_locked() {
 	uci -q set "$STATE_SECTION=state"
 	uci -q set "$STATE_SECTION.active=0"
 	uci -q commit "$STATE_CONFIG"
+	reset_firewall_check
+	rm -f "$FIREWALL_REPAIR_FILE"
 	log_info "已恢复 SmartDNS 与 OpenClash 的原始 DNS 配置"
 
 	[ "$restart_services" = "1" ] || return 0
@@ -355,9 +495,15 @@ reconcile_locked() {
 	local was_active restart_openclash="0"
 
 	[ -e "$STOP_FILE" ] && return 0
+	ensure_settings_config
+	apply_real_ip_default
 	was_active="$(uci -q get "$STATE_SECTION.active")"
 	if ! compatibility_required; then
+		reset_firewall_check
 		[ "$was_active" = "1" ] && restore_locked 1
+		if [ "$REAL_IP_DEFAULT_CHANGED" = "1" ] && /etc/init.d/openclash running >/dev/null 2>&1; then
+			/etc/init.d/openclash restart >/dev/null 2>&1
+		fi
 		return 0
 	fi
 
@@ -371,9 +517,11 @@ reconcile_locked() {
 
 	ensure_settings || return 1
 	[ "$OPENCLASH_CHANGED" = "1" ] && /etc/init.d/openclash running >/dev/null 2>&1 && restart_openclash="1"
+	[ "$REAL_IP_DEFAULT_CHANGED" = "1" ] && /etc/init.d/openclash running >/dev/null 2>&1 && restart_openclash="1"
 	if [ "$restart_openclash" = "1" ]; then
 		/etc/init.d/openclash restart >/dev/null 2>&1
 	fi
+	repair_openclash_firewall
 }
 
 reconcile() {
@@ -395,10 +543,14 @@ restore() {
 }
 
 run() {
+	local interval
+
 	trap 'release_lock; exit 0' TERM INT
+	reset_firewall_check
 	while true; do
 		reconcile
-		sleep "$INTERVAL" &
+		interval="$(get_positive_setting check_interval 5)"
+		sleep "$interval" &
 		wait $!
 	done
 }
